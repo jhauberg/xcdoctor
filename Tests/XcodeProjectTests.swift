@@ -5,14 +5,39 @@
 //  Created by Jacob Hauberg Hansen on 26/06/2020.
 //
 
-import XCTest
 @testable import XCDoctor
 
 import Foundation
+import XCTest
 
 class XcodeProjectTests: XCTestCase {
-    func testFileNotFound() {
+    func testProjectNotFound() {
         XCTAssertNil(XcodeProject(from:
             URL(fileURLWithPath: "~/Some/Project.xcodeproj")))
+    }
+
+    func testProjectFound() {
+        // note that this path assumes `$ swift test` from the root of the project;
+        // it does not work when run from Xcode
+        XCTAssertNotNil(XcodeProject(from:
+            URL(fileURLWithPath: "Tests/Subjects/missing-file.xcodeproj/project.pbxproj")))
+    }
+
+    func testFileUrls() {
+        let project = XcodeProject(from:
+            URL(fileURLWithPath: "Tests/Subjects/missing-file.xcodeproj/project.pbxproj"))!
+        XCTAssert(project.fileUrls.count == 1)
+    }
+
+    func testMissingFile() {
+        let project = XcodeProject(from:
+            URL(fileURLWithPath: "Tests/Subjects/missing-file.xcodeproj/project.pbxproj"))!
+        let diagnoses = examine(project: project, for: [.nonExistentFiles])
+        // TODO: this test should only assert that we end up with a single missing file;
+        //       it's another test whether we get the expected single diagnosis
+        XCTAssert(diagnoses.count == 1)
+        let diagnosis = diagnoses.first!
+        XCTAssertNotNil(diagnosis.cases)
+        XCTAssert(diagnosis.cases!.count == 1)
     }
 }
