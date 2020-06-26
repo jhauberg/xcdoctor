@@ -3,11 +3,12 @@
 //  xcdoctor
 //
 //  Created by Jacob Hauberg Hansen on 26/06/2020.
+//  Copyright © 2020 Jacob Hauberg Hansen. All rights reserved.
 //
 
 import Foundation
 
-public enum Diagnostic {
+enum Diagnostic {
     case important
     case information
     case note
@@ -40,14 +41,11 @@ public enum Diagnostic {
     }
 }
 
-public final class DiagnosticOutputStream: TextOutputStream {
-    public init() {
-        
-    }
+final class DiagnosticOutputStream: TextOutputStream {
     /**
      Determine whether the terminal supports escape codes for applying colors.
      */
-    public var supportsColor: Bool {
+    var supportsColor: Bool {
         guard let term = getenv("TERM") else {
             // terminal must have declared $TERM
             return false
@@ -67,9 +65,9 @@ public final class DiagnosticOutputStream: TextOutputStream {
         return true
     }
 
-    public var kind: Diagnostic = .information
+    var kind: Diagnostic = .information
 
-    public func write(_ string: String) {
+    func write(_ string: String) {
         kind.stream.write(Data(string.utf8))
     }
 }
