@@ -7,17 +7,17 @@
 
 import Foundation
 
-enum Defect {
+public enum Defect {
     case nonExistentFiles
 }
 
-struct Diagnosis {
-    let conclusion: String
-    let help: String?
-    let cases: [String]?
+public struct Diagnosis {
+    public let conclusion: String
+    public let help: String?
+    public let cases: [String]?
 }
 
-func examine(project: XcodeProject, for defects: [Defect]) -> [Diagnosis] {
+public func examine(project: XcodeProject, for defects: [Defect]) -> [Diagnosis] {
     var diagnoses: [Diagnosis] = []
     // TODO: separate each examination into smaller parts; a func per defect?
     for defect in defects {

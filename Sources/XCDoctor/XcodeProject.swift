@@ -7,13 +7,13 @@
 
 import Foundation
 
-struct XcodeProject {
+public struct XcodeProject {
     let pbxUrl: URL
     let rootUrl: URL
 
     private let propertyList: [String: Any]
 
-    init?(from url: URL) {
+    public init?(from url: URL) {
         do {
             let data = try Data(contentsOf: url)
             var format = PropertyListSerialization.PropertyListFormat.openStep

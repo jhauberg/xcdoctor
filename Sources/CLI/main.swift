@@ -7,10 +7,11 @@
 //
 
 import Foundation
+import XCDoctor
 
 var outputStream = DiagnosticOutputStream()
 
-func printdiag(text: String, kind: DiagnosticOutputStream.Diagnostic = .information) {
+func printdiag(text: String, kind: Diagnostic = .information) {
     outputStream.kind = kind
     // TODO: some debug validation of diagnostic messages; e.g.
     //         .important   should not be capitalized, and should not end with period
