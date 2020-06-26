@@ -12,6 +12,9 @@ var outputStream = DiagnosticOutputStream()
 
 func printdiag(text: String, kind: DiagnosticOutputStream.Diagnostic = .information) {
     outputStream.kind = kind
+    // TODO: some debug validation of diagnostic messages; e.g.
+    //         .important   should not be capitalized, and should not end with period
+    //         .information should be capitalized and end with period
     let prefix = "doctor:"
     var diagnostic: String = text
     if kind == .important {
@@ -22,6 +25,7 @@ func printdiag(text: String, kind: DiagnosticOutputStream.Diagnostic = .informat
         case .information:
             break // no color
         case .important:
+            // TODO: revisit coloring; this uses bright palette
             diagnostic = "\u{001B}[0;91m\(diagnostic)\u{001B}[0m"
         case .note:
             diagnostic = "\u{001B}[0;33m\(diagnostic)\u{001B}[0m"
@@ -92,15 +96,18 @@ struct Doctor: ParsableCommand {
         }
 
         if let project = XcodeProject(from: pbxUrl) {
-            let nonExistentFiles = project.fileUrls.filter { fileUrl -> Bool in
-                !FileManager.default.fileExists(atPath: fileUrl.path)
-            }
-            if !nonExistentFiles.isEmpty {
-                for nonExistentFile in nonExistentFiles {
-                    printdiag(text: nonExistentFile.standardized.relativePath, kind: .note)
+            for diagnosis in examine(project: project, for: [
+                .nonExistentFiles,
+            ]) {
+                if let references = diagnosis.cases {
+                    for reference in references {
+                        printdiag(text: reference, kind: .note)
+                    }
                 }
-                printdiag(text: "non-existent files are referenced in project", kind: .important)
-                printdiag(text: "File references to non-existent files should be removed from the project.", kind: .information)
+                printdiag(text: diagnosis.conclusion, kind: .important)
+                if let supplemental = diagnosis.help {
+                    printdiag(text: supplemental, kind: .information)
+                }
             }
         } else {
             printdiag(text: "unsupported Xcode project format", kind: .information)
