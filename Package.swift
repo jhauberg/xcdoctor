@@ -12,7 +12,8 @@ let package = Package(
             name: "xcdoctor",
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
-            ]
+            ],
+            path: "Sources"
         ),
     ]
 )
