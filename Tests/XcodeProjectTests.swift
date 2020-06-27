@@ -32,12 +32,9 @@ class XcodeProjectTests: XCTestCase {
     func testMissingFile() {
         let project = XcodeProject(from:
             URL(fileURLWithPath: "Tests/Subjects/missing-file.xcodeproj/project.pbxproj"))!
-        let diagnoses = examine(project: project, for: [.nonExistentFiles])
-        // TODO: this test should only assert that we end up with a single missing file;
-        //       it's another test whether we get the expected single diagnosis
-        XCTAssert(diagnoses.count == 1)
-        let diagnosis = diagnoses.first!
-        XCTAssertNotNil(diagnosis.cases)
-        XCTAssert(diagnosis.cases!.count == 1)
+        let diagnosis = examine(project: project, for: .nonExistentFiles)
+        XCTAssertNotNil(diagnosis)
+        XCTAssertNotNil(diagnosis!.cases)
+        XCTAssert(diagnosis!.cases!.count == 1)
     }
 }
