@@ -69,7 +69,7 @@ struct Doctor: ParsableCommand {
             }) {
                 path = xcodeProjectFile
             } else {
-                printdiag(text: "no project found", kind: .information)
+                printdiag(text: "no project found")
                 throw ExitCode.failure
             }
         } else {
@@ -77,21 +77,21 @@ struct Doctor: ParsableCommand {
         }
 
         if !FileManager.default.fileExists(atPath: path) {
-            printdiag(text: "project does not exist", kind: .information)
+            printdiag(text: "project does not exist")
             throw ExitCode.failure
         }
 
         let projectUrl = URL(fileURLWithPath: path)
 
         if projectUrl.pathExtension != "xcodeproj" {
-            printdiag(text: "file is not an Xcode project", kind: .information)
+            printdiag(text: "file is not an Xcode project")
             throw ExitCode.failure
         }
 
         let pbxUrl = projectUrl.appendingPathComponent("project.pbxproj")
 
         if !FileManager.default.fileExists(atPath: pbxUrl.path) {
-            printdiag(text: "unsupported Xcode project format", kind: .information)
+            printdiag(text: "unsupported Xcode project format")
             throw ExitCode.failure
         }
 
