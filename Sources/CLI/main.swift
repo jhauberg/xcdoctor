@@ -96,17 +96,23 @@ struct Doctor: ParsableCommand {
         }
 
         if let project = XcodeProject(from: pbxUrl) {
-            for diagnosis in examine(project: project, for: [
+            let conditions: [Defect] = [
                 .nonExistentFiles,
-            ]) {
-                if let references = diagnosis.cases {
-                    for reference in references {
-                        printdiag(text: reference, kind: .note)
-                    }
+            ]
+            for condition in conditions {
+                if verbose {
+                    printdiag(text: "Examining for \(condition) ...", kind: .information)
                 }
-                printdiag(text: diagnosis.conclusion, kind: .important)
-                if let supplemental = diagnosis.help {
-                    printdiag(text: supplemental, kind: .information)
+                if let diagnosis = examine(project: project, for: condition) {
+                    if let references = diagnosis.cases {
+                        for reference in references {
+                            printdiag(text: reference, kind: .note)
+                        }
+                    }
+                    printdiag(text: diagnosis.conclusion, kind: .important)
+                    if let supplemental = diagnosis.help {
+                        printdiag(text: supplemental, kind: .information)
+                    }
                 }
             }
         } else {

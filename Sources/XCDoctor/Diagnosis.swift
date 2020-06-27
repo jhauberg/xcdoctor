@@ -28,26 +28,22 @@ func nonExistentFilePaths(in project: XcodeProject) -> [String] {
     }
 }
 
-public func examine(project: XcodeProject, for defects: [Defect]) -> [Diagnosis] {
-    var diagnoses: [Diagnosis] = []
-    // TODO: separate each examination into smaller parts; a func per defect?
-    for defect in defects {
-        switch defect {
-        case .nonExistentFiles:
-            let files = nonExistentFilePaths(in: project)
-            if !files.isEmpty {
-                diagnoses.append(Diagnosis(
-                    conclusion: "non-existent file(s) referenced in project",
-                    // TODO: this text should be wrapped at X columns; can do manually, but ...
-                    help: """
-                    These files might have been moved or removed from the filesystem.
-                    In either case, each reference should be removed from the project;
-                    if a file has been moved, add back the file from its new location.
-                    """,
-                    cases: files
-                ))
-            }
+public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
+    switch defect {
+    case .nonExistentFiles:
+        let files = nonExistentFilePaths(in: project)
+        if !files.isEmpty {
+            return Diagnosis(
+                conclusion: "non-existent file(s) referenced in project",
+                // TODO: this text should be wrapped at X columns; can do manually, but ...
+                help: """
+                These files might have been moved or removed from the filesystem.
+                In either case, each reference should be removed from the project;
+                if a file has been moved, add back the file from its new location.
+                """,
+                cases: files
+            )
         }
     }
-    return diagnoses
+    return nil
 }
