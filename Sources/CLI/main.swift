@@ -26,8 +26,7 @@ func printdiag(text: String, kind: Diagnostic = .information) {
         case .information:
             break // no color
         case .important:
-            // TODO: revisit coloring; this uses bright palette
-            diagnostic = "\u{001B}[0;91m\(diagnostic)\u{001B}[0m"
+            diagnostic = "\u{001B}[0;31m\(diagnostic)\u{001B}[0m"
         case .note:
             diagnostic = "\u{001B}[0;33m\(diagnostic)\u{001B}[0m"
         }
