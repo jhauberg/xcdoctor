@@ -80,7 +80,8 @@ public struct XcodeProject {
             let obj = file.value as! [String: Any]
             var path = obj["path"] as! String
             let sourceTree = obj["sourceTree"] as! String
-            let fileType = obj["lastKnownFileType"] as? String
+            let potentialFileType = obj["lastKnownFileType"] as? String
+            let explicitfileType = obj["explicitFileType"] as? String
             switch sourceTree {
             case "":
                 // skip this file
@@ -117,10 +118,16 @@ public struct XcodeProject {
             default:
                 fatalError()
             }
+            let fileUrl: URL
+            if NSString(string: path).isAbsolutePath {
+                fileUrl = URL(fileURLWithPath: path)
+            } else {
+                fileUrl = rootUrl.appendingPathComponent(path)
+            }
             refs.append(
                 FileReference(
-                    url: rootUrl.appendingPathComponent(path),
-                    kind: fileType ?? "unknown"
+                    url: fileUrl,
+                    kind: explicitfileType ?? potentialFileType ?? "unknown"
                 ))
         }
     }
