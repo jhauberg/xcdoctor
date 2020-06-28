@@ -58,10 +58,8 @@ public struct XcodeProject {
 
         let fileReferences = objects.filter { (elem) -> Bool in
             if let obj = elem.value as? [String: Any] {
-                // must be a file reference
-                if let isa = obj["isa"] as? String, isa == "PBXFileReference",
-                    // and it must have an associated type
-                    let _ = obj["lastKnownFileType"] as? String {
+                if let isa = obj["isa"] as? String,
+                    isa == "PBXFileReference" {
                     return true
                 }
             }
@@ -69,9 +67,10 @@ public struct XcodeProject {
         }
         let groupReferences = objects.filter { (elem) -> Bool in
             if let obj = elem.value as? [String: Any] {
-                if let isa = obj["isa"] as? String, isa == "PBXGroup" || isa == "PBXVariantGroup",
-                    // and it must have children
-                    let children = obj["children"] as? [String], !children.isEmpty {
+                if let isa = obj["isa"] as? String,
+                    isa == "PBXGroup" || isa == "PBXVariantGroup",
+                    let children = obj["children"] as? [String],
+                    !children.isEmpty {
                     return true
                 }
             }
@@ -79,9 +78,9 @@ public struct XcodeProject {
         }
         for file in fileReferences {
             let obj = file.value as! [String: Any]
-            var path: String = obj["path"] as! String
-            let fileType: String = obj["lastKnownFileType"] as! String
-            let sourceTree: String = obj["sourceTree"] as! String
+            var path = obj["path"] as! String
+            let sourceTree = obj["sourceTree"] as! String
+            let fileType = obj["lastKnownFileType"] as? String
             switch sourceTree {
             case "":
                 // skip this file
@@ -107,7 +106,8 @@ public struct XcodeProject {
                     assert(parentReferences.count == 1)
                     let p = parentReferences.first!
                     let obj = p.value as! [String: Any]
-                    if let parentPath = obj["path"] as? String {
+                    if let parentPath = obj["path"] as? String,
+                        !parentPath.isEmpty {
                         path = "\(parentPath)/\(path)"
                     } else {
                         // non-folder group or root of hierarchy
@@ -120,7 +120,7 @@ public struct XcodeProject {
             refs.append(
                 FileReference(
                     url: rootUrl.appendingPathComponent(path),
-                    kind: fileType
+                    kind: fileType ?? "unknown"
                 ))
         }
     }
