@@ -22,9 +22,9 @@ public struct Diagnosis {
 func nonExistentFilePaths(in project: XcodeProject) -> [String] {
     project.files.filter { ref -> Bool in
         // include this reference if file does not exist
-        !FileManager.default.fileExists(atPath: ref.url.path)
+        !FileManager.default.fileExists(atPath: ref.path)
     }.map { ref -> String in
-        ref.path
+        return ref.path
     }
 }
 
