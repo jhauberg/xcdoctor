@@ -43,3 +43,7 @@ Package.resolved
 # .swiftpm
 
 .build/
+
+
+# allow project file resources recursively under Tests/
+!/Tests/**/*.xcodeproj
