@@ -102,6 +102,7 @@ struct Doctor: ParsableCommand {
 
         let conditions: [Defect] = [
             .nonExistentFiles,
+            .corruptPropertyLists
         ]
         for condition in conditions {
             if verbose {

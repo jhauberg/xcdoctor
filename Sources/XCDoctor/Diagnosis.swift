@@ -10,6 +10,7 @@ import Foundation
 
 public enum Defect {
     case nonExistentFiles
+    case corruptPropertyLists
 }
 
 public struct Diagnosis {
@@ -26,6 +27,10 @@ func nonExistentFilePaths(in project: XcodeProject) -> [String] {
         ref.path
     }
 }
+
+func propertyListReferences(in project: XcodeProject) -> [FileReference] {
+    project.files.filter { ref -> Bool in
+        ref.kind == "text.plist.xml" || ref.url.pathExtension == "plist"
     }
 }
 
@@ -44,6 +49,26 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
                 """,
                 cases: filePaths
             )
+        }
+    case .corruptPropertyLists:
+        let files = propertyListReferences(in: project)
+        var corruptedFilePaths: [String] = []
+        for file in files {
+            do {
+                _ = try PropertyListSerialization.propertyList(
+                    from: try Data(contentsOf: file.url),
+                    format: nil
+                )
+            } catch {
+                corruptedFilePaths.append(
+                    file.path)
+            }
+        }
+        if !corruptedFilePaths.isEmpty {
+            return Diagnosis(
+                conclusion: "corrupt plist",
+                help: "fix these by editing as plain-text using any editor",
+                cases: corruptedFilePaths)
         }
     }
     return nil
