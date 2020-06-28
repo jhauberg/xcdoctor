@@ -26,7 +26,7 @@ class XcodeProjectTests: XCTestCase {
     func testFileUrls() {
         let project = XcodeProject(from:
             URL(fileURLWithPath: "Tests/Subjects/missing-file.xcodeproj/project.pbxproj"))!
-        XCTAssert(project.fileUrls.count == 1)
+        XCTAssert(project.files.count == 1)
     }
 
     func testMissingFile() {

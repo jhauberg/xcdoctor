@@ -19,20 +19,21 @@ public struct Diagnosis {
 }
 
 func nonExistentFilePaths(in project: XcodeProject) -> [String] {
-    project.fileUrls.filter { url -> Bool in
-        // include this url if file does not exist
-        !FileManager.default.fileExists(atPath: url.path)
-    }.map { url -> String in
-        // transform url to readable path
-        url.standardized.relativePath
+    project.files.filter { ref -> Bool in
+        // include this reference if file does not exist
+        !FileManager.default.fileExists(atPath: ref.url.path)
+    }.map { ref -> String in
+        ref.path
+    }
+}
     }
 }
 
 public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
     switch defect {
     case .nonExistentFiles:
-        let files = nonExistentFilePaths(in: project)
-        if !files.isEmpty {
+        let filePaths = nonExistentFilePaths(in: project)
+        if !filePaths.isEmpty {
             return Diagnosis(
                 conclusion: "non-existent file(s) referenced in project",
                 // TODO: this text should be wrapped at X columns; can do manually, but ...
@@ -41,7 +42,7 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
                 In either case, each reference should be removed from the project;
                 if a file has been moved, add back the file from its new location.
                 """,
-                cases: files
+                cases: filePaths
             )
         }
     }

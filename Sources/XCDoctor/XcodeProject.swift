@@ -8,9 +8,24 @@
 
 import Foundation
 
+struct FileReference {
+    let url: URL
+    let kind: String
+
+    var path: String {
+        return url.standardized.relativePath
+    }
+}
+
 public struct XcodeProject {
     let pbxUrl: URL
     let rootUrl: URL
+
+    var files: [FileReference] {
+        refs
+    }
+
+    private var refs: [FileReference] = []
 
     private let propertyList: [String: Any]
 
@@ -28,8 +43,85 @@ public struct XcodeProject {
             rootUrl = pbxUrl // for example,    ~/Development/My/Project.xcodeproj/project.pbxproj
                 .deletingLastPathComponent() // ~/Development/My/Project.xcodeproj/
                 .deletingLastPathComponent() // ~/Development/My/
+            resolve()
         } catch {
             return nil
+        }
+    }
+
+    private mutating func resolve() {
+        refs.removeAll()
+
+        guard let objects = propertyList["objects"] as? [String: Any] else {
+            return
+        }
+
+        let fileReferences = objects.filter { (elem) -> Bool in
+            if let obj = elem.value as? [String: Any] {
+                // must be a file reference
+                if let isa = obj["isa"] as? String, isa == "PBXFileReference",
+                    // and it must have an associated type
+                    let _ = obj["lastKnownFileType"] as? String {
+                    return true
+                }
+            }
+            return false
+        }
+        let groupReferences = objects.filter { (elem) -> Bool in
+            if let obj = elem.value as? [String: Any] {
+                if let isa = obj["isa"] as? String, isa == "PBXGroup" || isa == "PBXVariantGroup",
+                    // and it must have children
+                    let children = obj["children"] as? [String], !children.isEmpty {
+                    return true
+                }
+            }
+            return false
+        }
+        for file in fileReferences {
+            let obj = file.value as! [String: Any]
+            var path: String = obj["path"] as! String
+            let fileType: String = obj["lastKnownFileType"] as! String
+            let sourceTree: String = obj["sourceTree"] as! String
+            switch sourceTree {
+            case "":
+                // skip this file
+                continue
+            case "SDKROOT":
+                // skip this file
+                continue
+            case "DEVELOPER_DIR":
+                // skip this file
+                continue
+            case "BUILT_PRODUCTS_DIR":
+                // skip this file
+                continue
+            case "SOURCE_ROOT":
+                // leave path unchanged
+                break
+            case "<absolute>":
+                // leave path unchanged
+                break
+            case "<group>":
+                var parentReferences = parents(of: file.key, in: groupReferences)
+                while !parentReferences.isEmpty {
+                    assert(parentReferences.count == 1)
+                    let p = parentReferences.first!
+                    let obj = p.value as! [String: Any]
+                    if let parentPath = obj["path"] as? String {
+                        path = "\(parentPath)/\(path)"
+                    } else {
+                        // non-folder group or root of hierarchy
+                    }
+                    parentReferences = parents(of: p.key, in: groupReferences)
+                }
+            default:
+                fatalError()
+            }
+            refs.append(
+                FileReference(
+                    url: rootUrl.appendingPathComponent(path),
+                    kind: fileType
+                ))
         }
     }
 
@@ -42,76 +134,5 @@ public struct XcodeProject {
         }
 
         return parents
-    }
-
-    // TODO: either make lazy or do this once during initialization (or an additional step, analyze/prepare()?)
-    var fileUrls: [URL] {
-        var fileUrls: [URL] = []
-        if let objects = propertyList["objects"] as? [String: Any] {
-            let fileReferences = objects.filter { (elem) -> Bool in
-                if let obj = elem.value as? [String: Any] {
-                    // must be a file reference
-                    if let isa = obj["isa"] as? String, isa == "PBXFileReference",
-                        // and it must have an associated type
-                        let _ = obj["lastKnownFileType"] as? String {
-                        return true
-                    }
-                }
-                return false
-            }
-            let groupReferences = objects.filter { (elem) -> Bool in
-                if let obj = elem.value as? [String: Any] {
-                    if let isa = obj["isa"] as? String, isa == "PBXGroup" || isa == "PBXVariantGroup",
-                        // and it must have children
-                        let children = obj["children"] as? [String], !children.isEmpty {
-                        return true
-                    }
-                }
-                return false
-            }
-            for file in fileReferences {
-                let obj = file.value as! [String: Any]
-                var path: String = obj["path"] as! String
-                let sourceTree: String = obj["sourceTree"] as! String
-                switch sourceTree {
-                case "":
-                    // skip this file
-                    continue
-                case "SDKROOT":
-                    // skip this file
-                    continue
-                case "DEVELOPER_DIR":
-                    // skip this file
-                    continue
-                case "BUILT_PRODUCTS_DIR":
-                    // skip this file
-                    continue
-                case "SOURCE_ROOT":
-                    // leave path unchanged
-                    break
-                case "<absolute>":
-                    // leave path unchanged
-                    break
-                case "<group>":
-                    var parentReferences = parents(of: file.key, in: groupReferences)
-                    while !parentReferences.isEmpty {
-                        assert(parentReferences.count == 1)
-                        let p = parentReferences.first!
-                        let obj = p.value as! [String: Any]
-                        if let parentPath = obj["path"] as? String {
-                            path = "\(parentPath)/\(path)"
-                        } else {
-                            // non-folder group or root of hierarchy
-                        }
-                        parentReferences = parents(of: p.key, in: groupReferences)
-                    }
-                default:
-                    fatalError()
-                }
-                fileUrls.append(
-                    rootUrl.appendingPathComponent(path))
-            }
-        }
-        return fileUrls
     }
 }
