@@ -12,6 +12,7 @@ public enum Defect {
     case nonExistentFiles
     case corruptPropertyLists
     case danglingFiles
+    case unusedResources
 }
 
 public struct Diagnosis {
@@ -40,6 +41,33 @@ func danglingFilePaths(in project: XcodeProject) -> [String] {
         ref.isSourceFile && !ref.hasTargetMembership
     }.map { ref -> String in
         ref.path
+    }
+}
+
+func sourceFiles(in project: XcodeProject) -> [FileReference] {
+    project.files.filter { ref -> Bool in
+        ref.isSourceFile
+    }
+}
+
+func assetNames(in project: XcodeProject) -> [String] {
+    project.files.filter { ref -> Bool in
+        ref.kind == "folder.assetcatalog" || ref.url.pathExtension == "xcassets"
+    }.flatMap { ref -> [String] in
+        do {
+            let assets = try FileManager.default.contentsOfDirectory(atPath: ref.url.path)
+                .filter { file -> Bool in
+                    return FileManager.default.fileExists(atPath:
+                        ref.url
+                            .appendingPathComponent(file)
+                            .appendingPathComponent("Contents.json").path)
+            }
+            return assets.map { asset -> String in
+                String(asset[..<asset.lastIndex(of: ".")!])
+            }
+        } catch {
+            return []
+        }
     }
 }
 
@@ -98,6 +126,42 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
                 These files might no longer be used; consider whether they should be deleted
                 """,
                 cases: filePaths
+            )
+        }
+    case .unusedResources:
+        var assets = assetNames(in: project)
+        // TODO: basically, grep -r "\"asset_name_here\"", but only for files in project
+        for source in sourceFiles(in: project) {
+            var isDirectory: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: source.url.path,
+                                                 isDirectory: &isDirectory),
+                !isDirectory.boolValue else {
+                continue
+            }
+            let fileContents: String
+            do {
+                fileContents = try String(contentsOf: source.url)
+            } catch {
+                #if DEBUG
+                    print(error)
+                #endif
+                continue
+            }
+            assets = assets.filter({ assetName -> Bool in
+                !fileContents.contains("\"\(assetName)\"")
+            })
+        }
+        if !assets.isEmpty {
+            return Diagnosis(
+                conclusion: "unused resources",
+                help: """
+                These assets might not be in use; consider whether they should be removed.
+                Keep in mind that this diagnosis is prone to produce false-positives as it
+                can not realistically detect all uses. For example, assets specified through
+                dynamically constructed resource names are likely to be reported as
+                unused resources.
+                """,
+                cases: assets
             )
         }
     }

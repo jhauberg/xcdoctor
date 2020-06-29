@@ -108,6 +108,7 @@ struct Doctor: ParsableCommand {
         // as that likely has a cascading effect throughout previous diagnoses
         let conditions: [Defect] = [
             .danglingFiles,
+            .unusedResources,
             .corruptPropertyLists,
             .nonExistentFiles,
         ]
