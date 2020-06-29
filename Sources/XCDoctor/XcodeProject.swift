@@ -29,6 +29,12 @@ struct FileReference {
     var path: String {
         url.standardized.relativePath
     }
+
+    var isSourceFile: Bool {
+        sourceTypes.contains { (fileType, extensions) -> Bool in
+            kind == fileType || extensions.contains(url.pathExtension)
+        }
+    }
 }
 
 public struct XcodeProject {

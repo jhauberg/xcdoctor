@@ -37,7 +37,7 @@ func propertyListReferences(in project: XcodeProject) -> [FileReference] {
 
 func danglingFilePaths(in project: XcodeProject) -> [String] {
     project.files.filter { ref -> Bool in
-        !ref.hasTargetMembership
+        ref.isSourceFile && !ref.hasTargetMembership
     }.map { ref -> String in
         ref.path
     }
