@@ -11,6 +11,7 @@ import Foundation
 struct FileReference {
     let url: URL
     let kind: String
+    let hasTargetMembership: Bool
 
     var path: String {
         return url.standardized.relativePath
@@ -76,6 +77,18 @@ public struct XcodeProject {
             }
             return false
         }
+        let buildReferences = objects.filter { (elem) -> Bool in
+            if let obj = elem.value as? [String: Any] {
+                if let isa = obj["isa"] as? String,
+                    isa == "PBXBuildFile" {
+                    return true
+                }
+            }
+            return false
+        }.map { (elem) -> String in
+            let obj = elem.value as! [String: Any]
+            return obj["fileRef"] as! String
+        }
         for file in fileReferences {
             let obj = file.value as! [String: Any]
             var path = obj["path"] as! String
@@ -124,22 +137,38 @@ public struct XcodeProject {
             } else {
                 fileUrl = rootUrl.appendingPathComponent(path)
             }
+            var isReferencedAsBuildFile: Bool = false
+            if buildReferences.contains(file.key) {
+                // file is directly referenced as a build file
+                isReferencedAsBuildFile = true
+            } else {
+                // file might be contained in a parent group that is referenced as a build file
+                var parentReferences = parents(of: file.key, in: groupReferences)
+                while !parentReferences.isEmpty {
+                    assert(parentReferences.count == 1)
+                    let p = parentReferences.first!
+                    if buildReferences.contains(p.key) {
+                        isReferencedAsBuildFile = true
+                        break
+                    }
+                    parentReferences = parents(of: p.key, in: groupReferences)
+                }
+            }
             refs.append(
                 FileReference(
                     url: fileUrl,
-                    kind: explicitfileType ?? potentialFileType ?? "unknown"
+                    kind: explicitfileType ?? potentialFileType ?? "unknown",
+                    hasTargetMembership: isReferencedAsBuildFile
                 ))
         }
     }
 
     private func parents(of reference: String, in groups: [String: Any])
         -> [String: Any] {
-        let parents = groups.filter { group -> Bool in
+        groups.filter { group -> Bool in
             let groupObj = group.value as! [String: Any]
             let children = groupObj["children"] as! [String]
             return children.contains(reference)
         }
-
-        return parents
     }
 }

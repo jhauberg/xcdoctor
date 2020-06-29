@@ -11,6 +11,7 @@ import Foundation
 public enum Defect {
     case nonExistentFiles
     case corruptPropertyLists
+    case danglingFiles
 }
 
 public struct Diagnosis {
@@ -22,7 +23,7 @@ public struct Diagnosis {
 func nonExistentFilePaths(in project: XcodeProject) -> [String] {
     project.files.filter { ref -> Bool in
         // include this reference if file does not exist
-        !FileManager.default.fileExists(atPath: ref.path)
+        !FileManager.default.fileExists(atPath: ref.url.path)
     }.map { ref -> String in
         return ref.path
     }
@@ -31,6 +32,14 @@ func nonExistentFilePaths(in project: XcodeProject) -> [String] {
 func propertyListReferences(in project: XcodeProject) -> [FileReference] {
     project.files.filter { ref -> Bool in
         ref.kind == "text.plist.xml" || ref.url.pathExtension == "plist"
+    }
+}
+
+func danglingFilePaths(in project: XcodeProject) -> [String] {
+    project.files.filter { ref -> Bool in
+        !ref.hasTargetMembership
+    }.map { ref -> String in
+        return ref.path
     }
 }
 
@@ -69,6 +78,17 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
                 conclusion: "corrupt plist",
                 help: "fix these by editing as plain-text using any editor",
                 cases: corruptedFilePaths)
+        }
+    case .danglingFiles:
+        let filePaths = danglingFilePaths(in: project)
+        if !filePaths.isEmpty {
+            return Diagnosis(
+                conclusion: "file(s) not included in any target",
+                help: """
+                These files might no longer be used; consider whether they should be deleted
+                """,
+                cases: filePaths
+            )
         }
     }
     return nil
