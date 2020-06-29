@@ -8,6 +8,19 @@
 
 import Foundation
 
+// a mapping of `lastKnownFileType` and its common extensions
+let sourceTypes: [(String, [String])] = [
+    ("file.storyboard", ["storyboard"]),
+    ("file.xib", ["xib", "nib"]),
+    ("folder.assetcatalog", ["xcassets"]),
+    ("sourcecode.c.c", ["c"]),
+    ("sourcecode.c.objc", ["m"]),
+    ("sourcecode.cpp.objcpp", ["mm"]),
+    ("sourcecode.cpp.cpp", ["cpp", "cc"]),
+    ("sourcecode.swift", ["swift"]),
+    ("sourcecode.metal", ["metal", "mtl"]),
+]
+
 struct FileReference {
     let url: URL
     let kind: String
