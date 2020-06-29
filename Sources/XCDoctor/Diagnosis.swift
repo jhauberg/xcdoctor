@@ -68,9 +68,18 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
                     from: try Data(contentsOf: file.url),
                     format: nil
                 )
-            } catch {
-                corruptedFilePaths.append(
-                    file.path)
+            } catch let error as NSError {
+                let additionalInfo: String
+                if let helpfulErrorMessage = error.userInfo[NSDebugDescriptionErrorKey] as? String {
+                    // this is typically along the lines of:
+                    //  "Value missing for key inside <dict> at line 7"
+                    additionalInfo = helpfulErrorMessage
+                } else {
+                    // this is typically more like:
+                    //  "The data couldn’t be read because it isn’t in the correct format."
+                    additionalInfo = error.localizedDescription
+                }
+                corruptedFilePaths.append("\(file.path): \(additionalInfo)")
             }
         }
         if !corruptedFilePaths.isEmpty {
