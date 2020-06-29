@@ -54,4 +54,13 @@ class XcodeProjectTests: XCTestCase {
         XCTAssertNotNil(diagnosis!.cases)
         XCTAssert(diagnosis!.cases!.count == 1)
     }
+
+    func testDanglingFile() {
+        let project = XcodeProject(
+            from: projectUrl(for: .danglingFiles))!
+        let diagnosis = examine(project: project, for: .danglingFiles)
+        XCTAssertNotNil(diagnosis)
+        XCTAssertNotNil(diagnosis!.cases)
+        XCTAssert(diagnosis!.cases!.count == 1)
+    }
 }
