@@ -99,11 +99,17 @@ struct Doctor: ParsableCommand {
             printdiag(text: "unsupported Xcode project format")
             throw ExitCode.failure
         }
-
+        // order examinations based on importance, so that the most important is run last;
+        // this may seem counter-intuitive, but in most cases, what you will read first
+        // is actually the output that came last (especially for long/many diagnoses)
+        // so with that assumption, it makes sense to order in such a way that
+        // you read from bottom-to-top and clear out defects in that order
+        // so, for example, nonExistentFiles should be cleared before danglingFiles,
+        // as that likely has a cascading effect throughout previous diagnoses
         let conditions: [Defect] = [
-            .nonExistentFiles,
+            .danglingFiles,
             .corruptPropertyLists,
-            .danglingFiles
+            .nonExistentFiles,
         ]
         for condition in conditions {
             if verbose {
