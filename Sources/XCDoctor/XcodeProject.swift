@@ -14,7 +14,7 @@ struct FileReference {
     let hasTargetMembership: Bool
 
     var path: String {
-        return url.standardized.relativePath
+        url.standardized.relativePath
     }
 }
 

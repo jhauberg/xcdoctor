@@ -14,7 +14,7 @@ class XcodeProjectTests: XCTestCase {
     func projectUrl(for defect: Defect) -> URL {
         // note that this assumes `$ swift test` from the root of the project;
         // it does not work when run from Xcode
-        return URL(fileURLWithPath: "Tests/Subjects/")
+        URL(fileURLWithPath: "Tests/Subjects/")
             .appendingPathComponent(
                 "\(defect)/xcdoctor.xcodeproj/project.pbxproj")
     }

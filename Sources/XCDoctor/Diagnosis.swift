@@ -25,7 +25,7 @@ func nonExistentFilePaths(in project: XcodeProject) -> [String] {
         // include this reference if file does not exist
         !FileManager.default.fileExists(atPath: ref.url.path)
     }.map { ref -> String in
-        return ref.path
+        ref.path
     }
 }
 
@@ -39,7 +39,7 @@ func danglingFilePaths(in project: XcodeProject) -> [String] {
     project.files.filter { ref -> Bool in
         !ref.hasTargetMembership
     }.map { ref -> String in
-        return ref.path
+        ref.path
     }
 }
 
@@ -77,7 +77,8 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
             return Diagnosis(
                 conclusion: "corrupt plist",
                 help: "fix these by editing as plain-text using any editor",
-                cases: corruptedFilePaths)
+                cases: corruptedFilePaths
+            )
         }
     case .danglingFiles:
         let filePaths = danglingFilePaths(in: project)
