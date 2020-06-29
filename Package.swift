@@ -25,7 +25,8 @@ let package = Package(
         .testTarget(
             name: "XCDoctorTests",
             dependencies: ["XCDoctor"],
-            path: "Tests"
+            path: "Tests",
+            exclude: ["Subjects"]
         ),
     ]
 )
