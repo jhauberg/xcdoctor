@@ -114,7 +114,11 @@ struct Doctor: ParsableCommand {
         ]
         for condition in conditions {
             if verbose {
-                printdiag(text: "Examining for \(condition) ...")
+                var diagnostic = "Examining for \(condition) ... "
+                if condition == .unusedResources {
+                    diagnostic += "This may take a while"
+                }
+                printdiag(text: diagnostic)
             }
             if let diagnosis = examine(project: project, for: condition) {
                 if let references = diagnosis.cases?.sorted() {
