@@ -13,6 +13,8 @@ let sourceTypes: [(String, [String])] = [
     ("file.storyboard", ["storyboard"]),
     ("file.xib", ["xib", "nib"]),
     ("folder.assetcatalog", ["xcassets"]),
+    ("text.plist.strings", ["strings"]),
+    ("text.plist.xml", ["plist"]),
     ("sourcecode.c.c", ["c"]),
     ("sourcecode.c.objc", ["m"]),
     ("sourcecode.cpp.objcpp", ["mm"]),
