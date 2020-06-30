@@ -50,20 +50,58 @@ func sourceFiles(in project: XcodeProject) -> [FileReference] {
     }
 }
 
-func assetNames(in project: XcodeProject) -> [String] {
+struct Resource {
+    let name: String
+    let fileName: String?
+
+    var nameVariants: [String] {
+        if let fileName = fileName {
+            let plainFileName = fileName
+                .replacingOccurrences(of: "@1x", with: "")
+                .replacingOccurrences(of: "@2x", with: "")
+                .replacingOccurrences(of: "@3x", with: "")
+            let plainName = name
+                .replacingOccurrences(of: "@1x", with: "")
+                .replacingOccurrences(of: "@2x", with: "")
+                .replacingOccurrences(of: "@3x", with: "")
+            return Array(Set([
+                name,
+                plainName,
+                fileName,
+                plainFileName,
+            ]))
+        }
+        return [name]
+    }
+}
+
+func resources(in project: XcodeProject) -> [Resource] {
+    let sources = sourceFiles(in: project)
+    return project.files.filter { ref -> Bool in
+        ref.hasTargetMembership && !sources.contains { sourceRef -> Bool in
+            ref.url == sourceRef.url
+        }
+    }.map { ref -> Resource in
+        Resource(name: ref.url.deletingPathExtension().lastPathComponent,
+                 fileName: ref.url.lastPathComponent)
+    }
+}
+
+func assets(in project: XcodeProject) -> [Resource] {
     project.files.filter { ref -> Bool in
         ref.kind == "folder.assetcatalog" || ref.url.pathExtension == "xcassets"
-    }.flatMap { ref -> [String] in
+    }.flatMap { ref -> [Resource] in
         do {
             let assets = try FileManager.default.contentsOfDirectory(atPath: ref.url.path)
                 .filter { file -> Bool in
-                    return FileManager.default.fileExists(atPath:
+                    FileManager.default.fileExists(atPath:
                         ref.url
                             .appendingPathComponent(file)
                             .appendingPathComponent("Contents.json").path)
-            }
-            return assets.map { asset -> String in
-                String(asset[..<asset.lastIndex(of: ".")!])
+                }
+            return assets.map { asset -> Resource in
+                Resource(name: String(asset[..<asset.lastIndex(of: ".")!]),
+                         fileName: nil)
             }
         } catch {
             return []
@@ -129,7 +167,12 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
             )
         }
     case .unusedResources:
-        var assets = assetNames(in: project)
+        // TODO: the resulting resources could potentially contain duplicates;
+        //       for example, if project contains two files:
+        //         "Icon10@2x.png" and "Icon10@3x.png"
+        //       this will result (as expected) in two different resources,
+        //       however, these could be squashed into one (with additional variants)
+        var res = resources(in: project) + assets(in: project)
         // TODO: basically, grep -r "\"asset_name_here\"", but only for files in project
         for source in sourceFiles(in: project) {
             var isDirectory: ObjCBool = false
@@ -140,6 +183,8 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
             }
             let fileContents: String
             do {
+                // TODO: this is a potentially heavy operation, as we read in entire
+                //       file at once; consider alternatives (grep through Process?)
                 fileContents = try String(contentsOf: source.url)
             } catch {
                 #if DEBUG
@@ -147,21 +192,45 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
                 #endif
                 continue
             }
-            assets = assets.filter({ assetName -> Bool in
-                !fileContents.contains("\"\(assetName)\"")
-            })
+            res = res.filter { resource -> Bool in
+                for resourceName in resource.nameVariants {
+                    let searchString: String
+                    if source.kind == "text.plist.xml" || source.url.pathExtension == "plist" {
+                        // search without quotes in property-lists; typically text in node contents
+                        searchString = "\(resourceName)"
+                    } else {
+                        // search with quotes in anything else; typically referenced as strings
+                        // in sourcecode and string attributes in xml (xib/storyboard)
+                        // TODO: this does not take commented lines into account
+                        //       - we could expand to support // comments; e.g.
+                        //         if resourceName occurs on a line preceded by "//"
+                        //         anywhere previously, then it doesn't count
+                        //         /**/ comments are much trickier, though
+                        searchString = "\"\(resourceName)\""
+                    }
+                    if fileContents.contains(searchString) {
+                        return false // resource seems to be used; don't search further for this
+                    }
+                }
+                return true // resource seems to be unused; keep searching for usages
+            }
         }
-        if !assets.isEmpty {
+        if !res.isEmpty {
             return Diagnosis(
                 conclusion: "unused resources",
                 help: """
                 These assets might not be in use; consider whether they should be removed.
                 Keep in mind that this diagnosis is prone to produce false-positives as it
-                can not realistically detect all uses. For example, assets specified through
-                dynamically constructed resource names are likely to be reported as
-                unused resources.
+                can not realistically detect all usages.
+                For example, assets specified through external references, or by dynamically
+                constructed names, are likely to be reported as unused resources, even though
+                they are actually used.
                 """,
-                cases: assets
+                cases: res.map { resource -> String in
+                    // prefer name including extension, as this can help distinguish
+                    // between asset catalog resources and plain resources not catalogued
+                    resource.fileName ?? resource.name
+                }
             )
         }
     }
