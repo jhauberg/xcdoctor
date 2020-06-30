@@ -183,7 +183,6 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
         //       this will result (as expected) in two different resources,
         //       however, these could be squashed into one (with additional variants)
         var res = resources(in: project) + assets(in: project)
-        // TODO: basically, grep -r "\"asset_name_here\"", but only for files in project
         for source in sourceFiles(in: project) {
             var isDirectory: ObjCBool = false
             guard FileManager.default.fileExists(atPath: source.url.path,

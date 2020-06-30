@@ -78,7 +78,8 @@ public struct XcodeProject {
                 if let settings = config["buildSettings"] as? [String: Any] {
                     if let infoPlistSetting = settings["INFOPLIST_FILE"] as? String {
                         let setting = infoPlistSetting.replacingOccurrences(
-                            of: "$(SRCROOT)", with: rootUrl.standardized.path)
+                            of: "$(SRCROOT)", with: rootUrl.standardized.path
+                        )
                         if file.url.standardized.path.hasSuffix(setting) {
                             return true
                         }
