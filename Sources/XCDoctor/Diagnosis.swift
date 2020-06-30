@@ -150,8 +150,10 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
         }
         if !corruptedFilePaths.isEmpty {
             return Diagnosis(
-                conclusion: "corrupt plist",
-                help: "fix these by editing as plain-text using any editor",
+                conclusion: "corrupt plist(s)",
+                help: """
+                These files must be fixed manually using any plain-text editor.
+                """,
                 cases: corruptedFilePaths
             )
         }
@@ -161,7 +163,7 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
             return Diagnosis(
                 conclusion: "file(s) not included in any target",
                 help: """
-                These files might no longer be used; consider whether they should be deleted
+                These files might not be used; consider whether they should be removed.
                 """,
                 cases: filePaths
             )
@@ -217,11 +219,11 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
         }
         if !res.isEmpty {
             return Diagnosis(
-                conclusion: "unused resources",
+                conclusion: "unused resource(s)",
                 help: """
-                These assets might not be in use; consider whether they should be removed.
-                Keep in mind that this diagnosis is prone to produce false-positives as it
-                can not realistically detect all usages.
+                These resources might not be used; consider whether they should be removed.
+                Note that this diagnosis is prone to produce false-positives as it can not
+                realistically detect all usages.
                 For example, assets specified through external references, or by dynamically
                 constructed names, are likely to be reported as unused resources, even though
                 they are actually used.
