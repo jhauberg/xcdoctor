@@ -50,9 +50,25 @@ public struct XcodeProject {
         refs
     }
 
+    public func referencesAssetAsAppIcon(named asset: String) -> Bool {
+        for elem in buildConfigs {
+            if let config = elem.value as? [String: Any] {
+                if let settings = config["buildSettings"] as? [String: Any] {
+                    if let appIconSetting = settings["ASSETCATALOG_COMPILER_APPICON_NAME"] as? String {
+                        if appIconSetting == asset {
+                            return true
+                        }
+                    }
+                }
+            }
+        }
+        return false
+    }
+
     private var refs: [FileReference] = []
 
     private let propertyList: [String: Any]
+    private var buildConfigs: [String: Any] = [:]
 
     public init?(from url: URL) {
         do {
@@ -112,6 +128,15 @@ public struct XcodeProject {
         }.map { (elem) -> String in
             let obj = elem.value as! [String: Any]
             return obj["fileRef"] as! String
+        }
+        buildConfigs = objects.filter { (elem) -> Bool in
+            if let obj = elem.value as? [String: Any] {
+                if let isa = obj["isa"] as? String,
+                    isa == "XCBuildConfiguration" {
+                    return true
+                }
+            }
+            return false
         }
         for file in fileReferences {
             let obj = file.value as! [String: Any]

@@ -199,10 +199,13 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
                     let searchString: String
                     if source.kind == "text.plist.xml" || source.url.pathExtension == "plist" {
                         // search without quotes in property-lists; typically text in node contents
+                        // e.g. "<key>Icon10</key>"
                         searchString = "\(resourceName)"
                     } else {
                         // search with quotes in anything else; typically referenced as strings
                         // in sourcecode and string attributes in xml (xib/storyboard)
+                        // e.g. "UIImage(named: "Icon")", or
+                        //      "<imageView ... image="Icon10" ...>"
                         // TODO: this does not take commented lines into account
                         //       - we could expand to support // comments; e.g.
                         //         if resourceName occurs on a line preceded by "//"
@@ -216,6 +219,15 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
                 }
                 return true // resource seems to be unused; keep searching for usages
             }
+        }
+        // find special cases, e.g. AppIcon
+        res = res.filter { resource -> Bool in
+            for resourceName in resource.nameVariants {
+                if project.referencesAssetAsAppIcon(named: resourceName) {
+                    return false // resource seems to be used; don't search further for this
+                }
+            }
+            return true // resource seems to be unused; keep searching for usages
         }
         if !res.isEmpty {
             return Diagnosis(
