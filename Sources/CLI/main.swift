@@ -117,7 +117,7 @@ struct Doctor: ParsableCommand {
                 printdiag(text: "Examining for \(condition) ...")
             }
             if let diagnosis = examine(project: project, for: condition) {
-                if let references = diagnosis.cases {
+                if let references = diagnosis.cases?.sorted() {
                     for reference in references {
                         printdiag(text: reference, kind: .note)
                     }
