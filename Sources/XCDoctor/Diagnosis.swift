@@ -38,7 +38,7 @@ func propertyListReferences(in project: XcodeProject) -> [FileReference] {
 
 func danglingFilePaths(in project: XcodeProject) -> [String] {
     project.files.filter { ref -> Bool in
-        ref.isSourceFile && !ref.hasTargetMembership
+        !ref.isHeaderFile && ref.isSourceFile && !ref.hasTargetMembership
     }.filter { ref -> Bool in
         // handle the special-case Info.plist
         if ref.kind == "text.plist.xml" || ref.url.pathExtension == "plist" {

@@ -11,7 +11,7 @@ import Foundation
 // a mapping of `lastKnownFileType` and its common extensions
 // note that files matching these indicators will be subject
 // to full-text search (unusedResources), so including assets
-// (e.g. images or videos, in particular) would not be ideal
+// (e.g. images, or videos, in particular) would not be ideal
 let sourceTypes: [(String, [String])] = [
     ("file.storyboard", ["storyboard"]),
     ("file.xib", ["xib", "nib"]),
@@ -19,9 +19,11 @@ let sourceTypes: [(String, [String])] = [
     ("text.plist.strings", ["strings"]),
     ("text.plist.xml", ["plist"]),
     ("sourcecode.c.c", ["c"]),
+    ("sourcecode.c.h", ["h"]),
     ("sourcecode.c.objc", ["m"]),
     ("sourcecode.cpp.objcpp", ["mm"]),
     ("sourcecode.cpp.cpp", ["cpp", "cc"]),
+    ("sourcecode.cpp.h", ["h", "hh"]),
     ("sourcecode.swift", ["swift"]),
     ("sourcecode.metal", ["metal", "mtl"]),
 ]
@@ -39,6 +41,11 @@ struct FileReference {
         sourceTypes.contains { (fileType, extensions) -> Bool in
             kind == fileType || extensions.contains(url.pathExtension)
         }
+    }
+
+    var isHeaderFile: Bool {
+        // TODO: should have some way of checking against sourceTypes instead of repeating
+        url.pathExtension == "h" || url.pathExtension == "hh"
     }
 }
 
