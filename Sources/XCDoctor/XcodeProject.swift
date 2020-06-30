@@ -70,8 +70,9 @@ public struct XcodeProject {
             if let config = elem.value as? [String: Any] {
                 if let settings = config["buildSettings"] as? [String: Any] {
                     if let infoPlistSetting = settings["INFOPLIST_FILE"] as? String {
-                        // TODO: doesn't handle variables like $(SRCROOT)
-                        if file.url.standardized.path.hasSuffix(infoPlistSetting) {
+                        let setting = infoPlistSetting.replacingOccurrences(
+                            of: "$(SRCROOT)", with: rootUrl.standardized.path)
+                        if file.url.standardized.path.hasSuffix(setting) {
                             return true
                         }
                     }
