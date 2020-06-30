@@ -212,14 +212,26 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
                     } else {
                         // search with quotes in anything else; typically referenced as strings
                         // in sourcecode and string attributes in xml (xib/storyboard)
-                        // e.g. "UIImage(named: "Icon")", or
-                        //      "<imageView ... image="Icon10" ...>"
+                        // e.g. `UIImage(named: "Icon10")`, or
+                        //      `<imageView ... image="Icon10" ...>`
+                        // however, consider the case:
+                        //      `loadspr("res/monster.png")`
+                        // here, the resource is actually "monster.png", but a build/copy phase
+                        // has moved the resource to another destination; this means searching
+                        //      `"monster.png"`
+                        // won't work out as we want it to; instead, we can just try to match
+                        // the end, which will work out no matter the destination; e.g.
+                        //      `monster.png"`
+                        // this should also work in more typical cases, as seen above, but is
+                        // more prone to false-positives, as it is not as direct a match as it
+                        // could be; im sure there's a hypothetical case where this is a problem
+                        // but i have yet to see it
                         // TODO: this does not take commented lines into account
                         //       - we could expand to support // comments; e.g.
                         //         if resourceName occurs on a line preceded by "//"
                         //         anywhere previously, then it doesn't count
                         //         /**/ comments are much trickier, though
-                        searchString = "\"\(resourceName)\""
+                        searchString = "\(resourceName)\""
                     }
                     if fileContents.contains(searchString) {
                         return false // resource seems to be used; don't search further for this
