@@ -186,11 +186,15 @@ public struct XcodeProject {
                     assert(parentReferences.count == 1)
                     let p = parentReferences.first!
                     let obj = p.value as! [String: Any]
-                    if let parentPath = obj["path"] as? String,
-                        !parentPath.isEmpty {
-                        path = "\(parentPath)/\(path)"
+                    if obj["name"] == nil {
+                        if let parentPath = obj["path"] as? String,
+                            !parentPath.isEmpty {
+                            path = "\(parentPath)/\(path)"
+                        } else {
+                            // non-folder group or root of hierarchy
+                        }
                     } else {
-                        // non-folder group or root of hierarchy
+                        // edge case, group might also have path, but it is likely invalid
                     }
                     parentReferences = parents(of: p.key, in: groupReferences)
                 }
