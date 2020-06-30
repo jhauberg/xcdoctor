@@ -84,9 +84,11 @@ struct Resource {
 func resources(in project: XcodeProject) -> [Resource] {
     let sources = sourceFiles(in: project)
     return project.files.filter { ref -> Bool in
-        ref.hasTargetMembership && !sources.contains { sourceRef -> Bool in
-            ref.url == sourceRef.url
-        }
+        // TODO: specific exclusions? e.g. "archive.ar"/"a"
+        ref.hasTargetMembership && ref.url.pathExtension != "a" &&
+            !sources.contains { sourceRef -> Bool in
+                ref.url == sourceRef.url
+            }
     }.map { ref -> Resource in
         Resource(name: ref.url.deletingPathExtension().lastPathComponent,
                  fileName: ref.url.lastPathComponent)
