@@ -50,12 +50,28 @@ public struct XcodeProject {
         refs
     }
 
-    public func referencesAssetAsAppIcon(named asset: String) -> Bool {
+    func referencesAssetAsAppIcon(named asset: String) -> Bool {
         for elem in buildConfigs {
             if let config = elem.value as? [String: Any] {
                 if let settings = config["buildSettings"] as? [String: Any] {
                     if let appIconSetting = settings["ASSETCATALOG_COMPILER_APPICON_NAME"] as? String {
                         if appIconSetting == asset {
+                            return true
+                        }
+                    }
+                }
+            }
+        }
+        return false
+    }
+
+    func referencesPropertyListInfoPlist(named file: FileReference) -> Bool {
+        for elem in buildConfigs {
+            if let config = elem.value as? [String: Any] {
+                if let settings = config["buildSettings"] as? [String: Any] {
+                    if let infoPlistSetting = settings["INFOPLIST_FILE"] as? String {
+                        // TODO: doesn't handle variables like $(SRCROOT)
+                        if file.url.standardized.path.hasSuffix(infoPlistSetting) {
                             return true
                         }
                     }
