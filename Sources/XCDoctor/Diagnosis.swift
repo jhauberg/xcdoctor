@@ -205,11 +205,11 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
             }
             res = res.filter { resource -> Bool in
                 for resourceName in resource.nameVariants {
-                    let searchString: String
+                    let searchStrings: [String]
                     if source.kind == "text.plist.xml" || source.url.pathExtension == "plist" {
                         // search without quotes in property-lists; typically text in node contents
                         // e.g. "<key>Icon10</key>"
-                        searchString = "\(resourceName)"
+                        searchStrings = ["\(resourceName)"]
                     } else {
                         // search with quotes in anything else; typically referenced as strings
                         // in sourcecode and string attributes in xml (xib/storyboard)
@@ -221,21 +221,20 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
                         // has moved the resource to another destination; this means searching
                         //      `"monster.png"`
                         // won't work out as we want it to; instead, we can just try to match
-                        // the end, which will work out no matter the destination; e.g.
-                        //      `monster.png"`
-                        // this should also work in more typical cases, as seen above, but is
-                        // more prone to false-positives, as it is not as direct a match as it
-                        // could be; im sure there's a hypothetical case where this is a problem
-                        // but i have yet to see it
+                        // the end, which should work out no matter the destination, while
+                        // still being decently specific; e.g.
+                        //      `/monster.png"`
                         // TODO: this does not take commented lines into account
                         //       - we could expand to support // comments; e.g.
                         //         if resourceName occurs on a line preceded by "//"
                         //         anywhere previously, then it doesn't count
                         //         /**/ comments are much trickier, though
-                        searchString = "\(resourceName)\""
+                        searchStrings = ["\"\(resourceName)\"", "/\(resourceName)\""]
                     }
-                    if fileContents.contains(searchString) {
-                        return false // resource seems to be used; don't search further for this
+                    for searchString in searchStrings {
+                        if fileContents.contains(searchString) {
+                            return false // resource seems to be used; don't search further for this
+                        }
                     }
                 }
                 return true // resource seems to be unused; keep searching for usages
