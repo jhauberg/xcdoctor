@@ -196,8 +196,7 @@ public struct XcodeProject {
                     assert(parentReferences.count == 1)
                     let p = parentReferences.first!
                     let groupObj = p.value as! [String: Any]
-                    if let parentPath = groupObj["path"] as? String,
-                        !parentPath.isEmpty {
+                    if let parentPath = groupObj["path"] as? String, !parentPath.isEmpty {
                         path = "\(parentPath)/\(path)"
                         let groupSourceTree = groupObj["sourceTree"] as! String
                         if groupSourceTree == "SOURCE_ROOT" {
@@ -237,6 +236,73 @@ public struct XcodeProject {
                     kind: explicitfileType ?? potentialFileType ?? "unknown",
                     hasTargetMembership: isReferencedAsBuildFile
                 ))
+        }
+
+        // TODO: this is almost completely duplicated from file traversal, though with
+        //       a difference of path being optional
+        for group in groupReferences {
+            let obj = group.value as! [String: Any]
+            guard var path = obj["path"] as? String else {
+                continue
+            }
+            let sourceTree = obj["sourceTree"] as! String
+            switch sourceTree {
+            case "":
+                // skip this file
+                continue
+            case "SDKROOT":
+                // skip this file
+                continue
+            case "DEVELOPER_DIR":
+                // skip this file
+                continue
+            case "BUILT_PRODUCTS_DIR":
+                // skip this file
+                continue
+            case "SOURCE_ROOT":
+                // leave path unchanged
+                break
+            case "<absolute>":
+                // leave path unchanged
+                break
+            case "<group>":
+                var parentReferences = parents(of: group.key, in: groupReferences)
+                while !parentReferences.isEmpty {
+                    assert(parentReferences.count == 1)
+                    let p = parentReferences.first!
+                    let groupObj = p.value as! [String: Any]
+                    if let parentPath = groupObj["path"] as? String, !parentPath.isEmpty {
+                        path = "\(parentPath)/\(path)"
+                        let groupSourceTree = groupObj["sourceTree"] as! String
+                        if groupSourceTree == "SOURCE_ROOT" {
+                            // don't resolve further back, even if
+                            // this group is a child of another group
+                            break
+                        }
+                    } else {
+                        // non-folder group or root of hierarchy
+                    }
+                    parentReferences = parents(of: p.key, in: groupReferences)
+                }
+            default:
+                fatalError()
+            }
+            let directoryUrl = resolvePath(path)
+            if !FileManager.default.fileExists(atPath: directoryUrl.standardized.path) {
+                // TODO: this group has an invalid path
+                //       - file path resolutions might still work for hildren, though (depending on
+                //         their sourceTree specifications)
+                //       consider whether this is worth diagnosing as a defect; it's objectively
+                //       wrong, but it doesn't necessarily break anything - but if it does
+                //       it's more important than nonExistentFiles because it cascades
+//                let name: String
+//                if let named = obj["name"] as? String {
+//                    name = named
+//                } else {
+//                    name = obj["path"] as! String
+//                }
+//                print("\(directoryUrl.standardized.path): \(name)")
+            }
         }
     }
 
