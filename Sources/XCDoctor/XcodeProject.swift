@@ -194,27 +194,18 @@ public struct XcodeProject {
                     assert(parentReferences.count == 1)
                     let p = parentReferences.first!
                     let obj = p.value as! [String: Any]
-                    if obj["name"] == nil {
-                        if let parentPath = obj["path"] as? String,
-                            !parentPath.isEmpty {
-                            path = "\(parentPath)/\(path)"
-                        } else {
-                            // non-folder group or root of hierarchy
-                        }
+                    if let parentPath = obj["path"] as? String,
+                        !parentPath.isEmpty {
+                        path = "\(parentPath)/\(path)"
                     } else {
-                        // edge case, group might also have path, but it is likely invalid
+                        // non-folder group or root of hierarchy
                     }
                     parentReferences = parents(of: p.key, in: groupReferences)
                 }
             default:
                 fatalError()
             }
-            let fileUrl: URL
-            if NSString(string: path).isAbsolutePath {
-                fileUrl = URL(fileURLWithPath: path)
-            } else {
-                fileUrl = rootUrl.appendingPathComponent(path)
-            }
+            let fileUrl = resolvePath(path)
             var isReferencedAsBuildFile: Bool = false
             if buildReferences.contains(file.key) {
                 // file is directly referenced as a build file
@@ -239,6 +230,13 @@ public struct XcodeProject {
                     hasTargetMembership: isReferencedAsBuildFile
                 ))
         }
+    }
+
+    private func resolvePath(_ path: String) -> URL {
+        if NSString(string: path).isAbsolutePath {
+            return URL(fileURLWithPath: path)
+        }
+        return rootUrl.appendingPathComponent(path)
     }
 
     private func parents(of reference: String, in groups: [String: Any])
