@@ -19,7 +19,7 @@ let sourceTypes: [(String, [String])] = [
     ("text.plist.strings", ["strings"]),
     ("text.plist.xml", ["plist"]),
     ("sourcecode.c.c", ["c"]),
-    ("sourcecode.c.h", ["h"]),
+    ("sourcecode.c.h", ["h", "pch"]),
     ("sourcecode.c.objc", ["m"]),
     ("sourcecode.cpp.objcpp", ["mm"]),
     ("sourcecode.cpp.cpp", ["cpp", "cc"]),
@@ -45,7 +45,9 @@ struct FileReference {
 
     var isHeaderFile: Bool {
         // TODO: should have some way of checking against sourceTypes instead of repeating
-        url.pathExtension == "h" || url.pathExtension == "hh"
+        //       for example, a file like prefix.pch would not be considered a headerfile
+        //       - but does have kind "sourcecode.c.h"
+        url.pathExtension == "h" || url.pathExtension == "hh" || url.pathExtension == "pch"
     }
 }
 
