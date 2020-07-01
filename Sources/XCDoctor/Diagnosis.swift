@@ -24,7 +24,7 @@ public struct Diagnosis {
 func nonExistentFilePaths(in project: XcodeProject) -> [String] {
     project.files.filter { ref -> Bool in
         // include this reference if file does not exist
-        !FileManager.default.fileExists(atPath: ref.url.path)
+        !FileManager.default.fileExists(atPath: ref.path)
     }.map { ref -> String in
         ref.path
     }
@@ -107,7 +107,9 @@ func assets(in project: XcodeProject) -> [Resource] {
                     FileManager.default.fileExists(atPath:
                         ref.url
                             .appendingPathComponent(file)
-                            .appendingPathComponent("Contents.json").path)
+                            .appendingPathComponent("Contents.json")
+                            .standardized.path
+                    )
                 }
             return assets.map { asset -> Resource in
                 Resource(name: String(asset[..<asset.lastIndex(of: ".")!]),
@@ -187,7 +189,7 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
         var res = resources(in: project) + assets(in: project)
         for source in sourceFiles(in: project) {
             var isDirectory: ObjCBool = false
-            guard FileManager.default.fileExists(atPath: source.url.path,
+            guard FileManager.default.fileExists(atPath: source.path,
                                                  isDirectory: &isDirectory),
                 !isDirectory.boolValue else {
                 continue

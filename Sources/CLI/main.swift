@@ -90,7 +90,7 @@ struct Doctor: ParsableCommand {
 
         let pbxUrl = projectUrl.appendingPathComponent("project.pbxproj")
 
-        if !FileManager.default.fileExists(atPath: pbxUrl.path) {
+        if !FileManager.default.fileExists(atPath: pbxUrl.standardized.path) {
             printdiag(text: "unsupported Xcode project format")
             throw ExitCode.failure
         }
