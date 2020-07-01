@@ -111,6 +111,7 @@ struct Doctor: ParsableCommand {
             .unusedResources,
             .corruptPropertyLists,
             .nonExistentFiles,
+            .nonExistentPaths,
         ]
         for condition in conditions {
             if verbose {

@@ -13,6 +13,7 @@ public enum Defect {
     case corruptPropertyLists
     case danglingFiles
     case unusedResources
+    case nonExistentPaths
 }
 
 public struct Diagnosis {
@@ -27,6 +28,14 @@ func nonExistentFilePaths(in project: XcodeProject) -> [String] {
         !FileManager.default.fileExists(atPath: ref.path)
     }.map { ref -> String in
         ref.path
+    }
+}
+
+func nonExistentGroupPaths(in project: XcodeProject) -> [String] {
+    project.groups.filter { ref -> Bool in
+        !FileManager.default.fileExists(atPath: ref.path)
+    }.map { ref -> String in
+        "\(ref.path): Path referenced in group \"\(ref.name)\""
     }
 }
 
@@ -135,6 +144,18 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
                 if a file has been moved, add back the file from its new location.
                 """,
                 cases: filePaths
+            )
+        }
+    case .nonExistentPaths:
+        let dirPaths = nonExistentGroupPaths(in: project)
+        if !dirPaths.isEmpty {
+            return Diagnosis(
+                conclusion: "non-existent path(s) referenced in groups",
+                help: """
+                If not corrected, these paths can cause tools to erroneously
+                map children of each group to non-existent files.
+                """,
+                cases: dirPaths
             )
         }
     case .corruptPropertyLists:

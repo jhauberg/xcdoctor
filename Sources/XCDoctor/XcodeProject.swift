@@ -28,6 +28,15 @@ let sourceTypes: [(String, [String])] = [
     ("sourcecode.metal", ["metal", "mtl"]),
 ]
 
+struct GroupReference {
+    let url: URL
+    let name: String
+
+    var path: String {
+        url.standardized.relativePath
+    }
+}
+
 struct FileReference {
     let url: URL
     let kind: String
@@ -56,7 +65,11 @@ public struct XcodeProject {
     let rootUrl: URL
 
     var files: [FileReference] {
-        refs
+        fileRefs
+    }
+
+    var groups: [GroupReference] {
+        groupRefs
     }
 
     func referencesAssetAsAppIcon(named asset: String) -> Bool {
@@ -92,7 +105,8 @@ public struct XcodeProject {
         return false
     }
 
-    private var refs: [FileReference] = []
+    private var fileRefs: [FileReference] = []
+    private var groupRefs: [GroupReference] = []
 
     private let propertyList: [String: Any]
     private var buildConfigs: [String: Any] = [:]
@@ -118,7 +132,8 @@ public struct XcodeProject {
     }
 
     private mutating func resolve() {
-        refs.removeAll()
+        fileRefs.removeAll()
+        groupRefs.removeAll()
 
         guard let objects = propertyList["objects"] as? [String: Any] else {
             return
@@ -230,7 +245,7 @@ public struct XcodeProject {
                     parentReferences = parents(of: p.key, in: groupReferences)
                 }
             }
-            refs.append(
+            fileRefs.append(
                 FileReference(
                     url: fileUrl,
                     kind: explicitfileType ?? potentialFileType ?? "unknown",
@@ -288,21 +303,18 @@ public struct XcodeProject {
                 fatalError()
             }
             let directoryUrl = resolvePath(path)
-            if !FileManager.default.fileExists(atPath: directoryUrl.standardized.path) {
-                // TODO: this group has an invalid path
-                //       - file path resolutions might still work for hildren, though (depending on
-                //         their sourceTree specifications)
-                //       consider whether this is worth diagnosing as a defect; it's objectively
-                //       wrong, but it doesn't necessarily break anything - but if it does
-                //       it's more important than nonExistentFiles because it cascades
-//                let name: String
-//                if let named = obj["name"] as? String {
-//                    name = named
-//                } else {
-//                    name = obj["path"] as! String
-//                }
-//                print("\(directoryUrl.standardized.path): \(name)")
+            let name: String
+            if let named = obj["name"] as? String {
+                name = named
+            } else {
+                // grab path as-is, unresolved
+                name = obj["path"] as! String
             }
+            groupRefs.append(
+                GroupReference(
+                    url: directoryUrl,
+                    name: name
+                ))
         }
     }
 
