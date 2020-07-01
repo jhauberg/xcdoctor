@@ -193,10 +193,16 @@ public struct XcodeProject {
                 while !parentReferences.isEmpty {
                     assert(parentReferences.count == 1)
                     let p = parentReferences.first!
-                    let obj = p.value as! [String: Any]
-                    if let parentPath = obj["path"] as? String,
+                    let groupObj = p.value as! [String: Any]
+                    if let parentPath = groupObj["path"] as? String,
                         !parentPath.isEmpty {
                         path = "\(parentPath)/\(path)"
+                        let groupSourceTree = groupObj["sourceTree"] as! String
+                        if groupSourceTree == "SOURCE_ROOT" {
+                            // don't resolve further back, even if
+                            // this group is a child of another group
+                            break
+                        }
                     } else {
                         // non-folder group or root of hierarchy
                     }
