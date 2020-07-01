@@ -278,7 +278,7 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
                 help: """
                 These resources might not be used; consider whether they should be removed.
                 Note that this diagnosis is prone to produce false-positives as it can not
-                realistically detect all usages.
+                realistically detect all usages with certainty.
                 For example, assets specified through external references, or by dynamically
                 constructed names, are likely to be reported as unused resources, even though
                 they are actually used.
