@@ -47,7 +47,8 @@ struct Doctor: ParsableCommand {
         """
         A path to an Xcode project file.
 
-        You can put in "." to look for a project in the current working directory.
+        You can put in "." to look for a project in the
+        current working directory.
         """)
     var xcodeproj: String
 
@@ -55,7 +56,9 @@ struct Doctor: ParsableCommand {
     var verbose: Bool = false
 
     func validate() throws {
-        // TODO: validate that xcodeproj is a path (maybe try making a URL?)
+        guard let _ = URL(string: xcodeproj) else {
+            throw ValidationError("\(xcodeproj): invalid path")
+        }
     }
 
     mutating func run() throws {
@@ -69,7 +72,7 @@ struct Doctor: ParsableCommand {
             }) {
                 path = xcodeProjectFile
             } else {
-                printdiag(text: "no project found")
+                printdiag(text: "\(FileManager.default.currentDirectoryPath): no project found")
                 throw ExitCode.failure
             }
         } else {
@@ -77,26 +80,26 @@ struct Doctor: ParsableCommand {
         }
 
         if !FileManager.default.fileExists(atPath: path) {
-            printdiag(text: "project does not exist")
+            printdiag(text: "\(path): project does not exist")
             throw ExitCode.failure
         }
 
         let projectUrl = URL(fileURLWithPath: path)
 
         if projectUrl.pathExtension != "xcodeproj" {
-            printdiag(text: "file is not an Xcode project")
+            printdiag(text: "\(projectUrl.standardized.path): file is not an Xcode project")
             throw ExitCode.failure
         }
 
         let pbxUrl = projectUrl.appendingPathComponent("project.pbxproj")
 
         if !FileManager.default.fileExists(atPath: pbxUrl.standardized.path) {
-            printdiag(text: "unsupported Xcode project format")
+            printdiag(text: "\(projectUrl.standardized.path): unsupported Xcode project format")
             throw ExitCode.failure
         }
 
         guard let project = XcodeProject(from: pbxUrl) else {
-            printdiag(text: "unsupported Xcode project format")
+            printdiag(text: "\(projectUrl.standardized.path): unsupported Xcode project format")
             throw ExitCode.failure
         }
         // order examinations based on importance, so that the most important is run last;
