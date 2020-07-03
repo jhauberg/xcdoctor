@@ -43,48 +43,47 @@ struct Doctor: ParsableCommand {
     )
 
     @Argument(help:
-        // TODO: or a path to a directory containing an Xcode project file
         """
         A path to an Xcode project file.
 
-        You can put in "." to look for a project in the
-        current working directory.
+        You can put in a path to a directory to automatically
+        look for a project at that location, or "." to look
+        for a project in the current working directory.
         """)
     var xcodeproj: String
 
     @Flag(name: .shortAndLong, help: "Show diagnostic messages.")
     var verbose: Bool = false
 
-    func validate() throws {
-        guard let _ = URL(string: xcodeproj) else {
-            throw ValidationError("\(xcodeproj): invalid path")
-        }
-    }
-
     mutating func run() throws {
-        let path: String
+        let searchUrl: URL
+        if NSString(string: xcodeproj).isAbsolutePath {
+            searchUrl = URL(fileURLWithPath: xcodeproj)
+        } else {
+            searchUrl = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+                .appendingPathComponent(xcodeproj)
+        }
 
-        if xcodeproj == "." {
-            let files = try FileManager.default.contentsOfDirectory(atPath:
-                FileManager.default.currentDirectoryPath)
+        let projectUrl: URL
+        if searchUrl.hasDirectoryPath {
+            let files = try FileManager.default.contentsOfDirectory(
+                atPath: searchUrl.standardized.path)
             if let xcodeProjectFile = files.first(where: { file -> Bool in
                 file.hasSuffix("xcodeproj")
             }) {
-                path = xcodeProjectFile
+                projectUrl = searchUrl.appendingPathComponent(xcodeProjectFile)
             } else {
-                printdiag(text: "\(FileManager.default.currentDirectoryPath): no project found")
+                printdiag(text: "\(searchUrl.standardized.path): no projects found")
                 throw ExitCode.failure
             }
         } else {
-            path = xcodeproj
+            projectUrl = searchUrl
         }
 
-        if !FileManager.default.fileExists(atPath: path) {
-            printdiag(text: "\(path): project does not exist")
+        if !FileManager.default.fileExists(atPath: projectUrl.standardized.path) {
+            printdiag(text: "\(projectUrl.standardized.path): project not found")
             throw ExitCode.failure
         }
-
-        let projectUrl = URL(fileURLWithPath: path)
 
         if projectUrl.pathExtension != "xcodeproj" {
             printdiag(text: "\(projectUrl.standardized.path): file is not an Xcode project")
