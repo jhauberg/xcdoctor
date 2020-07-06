@@ -106,25 +106,51 @@ func resources(in project: XcodeProject) -> [Resource] {
     }
 }
 
-func assets(in project: XcodeProject) -> [Resource] {
-    project.files.filter { ref -> Bool in
+extension URL {
+    var isAssetURL: Bool {
+        FileManager.default.fileExists(atPath:
+            appendingPathComponent("Contents.json").path)
+    }
+}
+
+func assetURLs(at url: URL) throws -> [URL] {
+    guard let dirEnumerator = FileManager.default.enumerator(
+        at: url,
+        includingPropertiesForKeys: [.isDirectoryKey]
+    ) else {
+        return []
+    }
+
+    return try dirEnumerator.filter { item -> Bool in
+        guard let fileUrl = item as? URL else {
+            return false
+        }
+        let attr = try fileUrl.resourceValues(forKeys: [
+            .isDirectoryKey,
+        ])
+        if !attr.isDirectory! {
+            return false
+        }
+        if !fileUrl.isAssetURL {
+            return false
+        }
+        guard !fileUrl.pathExtension.isEmpty else {
+            // probably a folder; keep recursing
+            return false
+        }
+        return true
+    }.map { item -> URL in
+        item as! URL
+    }
+}
+
+func assets(in project: XcodeProject) throws -> [Resource] {
+    try project.files.filter { ref -> Bool in
         ref.kind == "folder.assetcatalog" || ref.url.pathExtension == "xcassets"
     }.flatMap { ref -> [Resource] in
-        do {
-            let assets = try FileManager.default.contentsOfDirectory(atPath: ref.url.path)
-                .filter { file -> Bool in
-                    FileManager.default.fileExists(atPath:
-                        ref.url
-                            .appendingPathComponent(file)
-                            .appendingPathComponent("Contents.json")
-                            .standardized.path)
-                }
-            return assets.map { asset -> Resource in
-                Resource(name: String(asset[..<asset.lastIndex(of: ".")!]),
-                         fileName: nil)
-            }
-        } catch {
-            return []
+        try assetURLs(at: ref.url).map { assetUrl -> Resource in
+            Resource(name: assetUrl.deletingPathExtension().lastPathComponent,
+                     fileName: nil)
         }
     }
 }
@@ -206,7 +232,13 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
         //         "Icon10@2x.png" and "Icon10@3x.png"
         //       this will result (as expected) in two different resources,
         //       however, these could be squashed into one (with additional variants)
-        var res = resources(in: project) + assets(in: project)
+        let assetFiles: [Resource]
+        do {
+            assetFiles = try assets(in: project)
+        } catch {
+            fatalError("\(error)")
+        }
+        var res = resources(in: project) + assetFiles
         for source in sourceFiles(in: project) {
             var isDirectory: ObjCBool = false
             guard FileManager.default.fileExists(atPath: source.path,
