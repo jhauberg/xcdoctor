@@ -117,8 +117,7 @@ func assets(in project: XcodeProject) -> [Resource] {
                         ref.url
                             .appendingPathComponent(file)
                             .appendingPathComponent("Contents.json")
-                            .standardized.path
-                    )
+                            .standardized.path)
                 }
             return assets.map { asset -> Resource in
                 Resource(name: String(asset[..<asset.lastIndex(of: ".")!]),

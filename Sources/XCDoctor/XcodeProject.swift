@@ -76,7 +76,8 @@ public struct XcodeProject {
         for elem in buildConfigs {
             if let config = elem.value as? [String: Any] {
                 if let settings = config["buildSettings"] as? [String: Any] {
-                    if let appIconSetting = settings["ASSETCATALOG_COMPILER_APPICON_NAME"] as? String {
+                    if let appIconSetting =
+                        settings["ASSETCATALOG_COMPILER_APPICON_NAME"] as? String {
                         if appIconSetting == asset {
                             return true
                         }
@@ -250,7 +251,8 @@ public struct XcodeProject {
                     url: fileUrl,
                     kind: explicitfileType ?? potentialFileType ?? "unknown",
                     hasTargetMembership: isReferencedAsBuildFile
-                ))
+                )
+            )
         }
 
         // TODO: this is almost completely duplicated from file traversal, though with
@@ -314,7 +316,8 @@ public struct XcodeProject {
                 GroupReference(
                     url: directoryUrl,
                     name: name
-                ))
+                )
+            )
         }
     }
 

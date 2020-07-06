@@ -16,7 +16,8 @@ class XcodeProjectTests: XCTestCase {
         // it does not work when run from Xcode
         URL(fileURLWithPath: "Tests/Subjects/")
             .appendingPathComponent(
-                "\(defect)/xcdoctor.xcodeproj/project.pbxproj")
+                "\(defect)/xcdoctor.xcodeproj/project.pbxproj"
+            )
     }
 
     func testProjectNotFound() {
@@ -27,19 +28,22 @@ class XcodeProjectTests: XCTestCase {
 
     func testProjectFound() {
         let project = XcodeProject(
-            from: projectUrl(for: .nonExistentFiles))!
+            from: projectUrl(for: .nonExistentFiles)
+        )!
         XCTAssertNotNil(project)
     }
 
     func testFileUrls() {
         let project = XcodeProject(
-            from: projectUrl(for: .nonExistentFiles))!
+            from: projectUrl(for: .nonExistentFiles)
+        )!
         XCTAssert(project.files.count == 1)
     }
 
     func testMissingFile() {
         let project = XcodeProject(
-            from: projectUrl(for: .nonExistentFiles))!
+            from: projectUrl(for: .nonExistentFiles)
+        )!
         let diagnosis = examine(project: project, for: .nonExistentFiles)
         XCTAssertNotNil(diagnosis)
         XCTAssertNotNil(diagnosis!.cases)
@@ -48,7 +52,8 @@ class XcodeProjectTests: XCTestCase {
 
     func testCorruptPlist() {
         let project = XcodeProject(
-            from: projectUrl(for: .corruptPropertyLists))!
+            from: projectUrl(for: .corruptPropertyLists)
+        )!
         let diagnosis = examine(project: project, for: .corruptPropertyLists)
         XCTAssertNotNil(diagnosis)
         XCTAssertNotNil(diagnosis!.cases)
@@ -57,7 +62,8 @@ class XcodeProjectTests: XCTestCase {
 
     func testDanglingFile() {
         let project = XcodeProject(
-            from: projectUrl(for: .danglingFiles))!
+            from: projectUrl(for: .danglingFiles)
+        )!
         let diagnosis = examine(project: project, for: .danglingFiles)
         XCTAssertNotNil(diagnosis)
         XCTAssertNotNil(diagnosis!.cases)
