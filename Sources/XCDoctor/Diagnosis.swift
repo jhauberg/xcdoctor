@@ -96,6 +96,7 @@ func resources(in project: XcodeProject) -> [Resource] {
         // TODO: specific exclusions? e.g. "archive.ar"/"a", ".whatever" etc
         ref.hasTargetMembership &&
             ref.url.pathExtension != "a" &&
+            ref.url.pathExtension != "xcconfig" &&
             !ref.url.lastPathComponent.hasPrefix(".") &&
             !sources.contains { sourceRef -> Bool in
                 ref.url == sourceRef.url
