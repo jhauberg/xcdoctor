@@ -65,9 +65,10 @@ struct Doctor: ParsableCommand {
         }
 
         let projectUrl: URL
-        if searchUrl.hasDirectoryPath {
+        if searchUrl.pathExtension != "xcodeproj", searchUrl.hasDirectoryPath {
             let files = try FileManager.default.contentsOfDirectory(
-                atPath: searchUrl.standardized.path)
+                atPath: searchUrl.standardized.path
+            )
             if let xcodeProjectFile = files.first(where: { file -> Bool in
                 file.hasSuffix("xcodeproj")
             }) {
