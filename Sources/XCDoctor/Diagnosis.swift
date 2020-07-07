@@ -22,19 +22,27 @@ public struct Diagnosis {
     public let cases: [String]?
 }
 
-func nonExistentFilePaths(in project: XcodeProject) -> [String] {
+func nonExistentFiles(in project: XcodeProject) -> [FileReference] {
     project.files.filter { ref -> Bool in
         // include this reference if file does not exist
         !FileManager.default.fileExists(atPath: ref.path)
-    }.map { ref -> String in
+    }
+}
+
+func nonExistentFilePaths(in project: XcodeProject) -> [String] {
+    nonExistentFiles(in: project).map { ref -> String in
         ref.path
     }
 }
 
-func nonExistentGroupPaths(in project: XcodeProject) -> [String] {
+func nonExistentGroups(in project: XcodeProject) -> [GroupReference] {
     project.groups.filter { ref -> Bool in
         !FileManager.default.fileExists(atPath: ref.path)
-    }.map { ref -> String in
+    }
+}
+
+func nonExistentGroupPaths(in project: XcodeProject) -> [String] {
+    nonExistentGroups(in: project).map { ref -> String in
         "\(ref.path): Path referenced in group \"\(ref.name)\""
     }
 }
@@ -60,8 +68,11 @@ func danglingFilePaths(in project: XcodeProject) -> [String] {
 }
 
 func sourceFiles(in project: XcodeProject) -> [FileReference] {
-    project.files.filter { ref -> Bool in
-        ref.isSourceFile
+    let exceptFiles = nonExistentFiles(in: project)
+    return project.files.filter { ref -> Bool in
+        ref.isSourceFile && !exceptFiles.contains(where: { otherRef -> Bool in
+            ref.url == otherRef.url
+        })
     }
 }
 
@@ -108,13 +119,21 @@ func resources(in project: XcodeProject) -> [Resource] {
 }
 
 extension URL {
+    /**
+     Return true if the url points to a directory containing a `Contents.json` file.
+     */
     var isAssetURL: Bool {
         FileManager.default.fileExists(atPath:
             appendingPathComponent("Contents.json").path)
     }
+
+    var isDirectory: Bool {
+        let values = try? resourceValues(forKeys: [.isDirectoryKey])
+        return values?.isDirectory ?? false
+    }
 }
 
-func assetURLs(at url: URL) throws -> [URL] {
+func assetURLs(at url: URL) -> [URL] {
     guard let dirEnumerator = FileManager.default.enumerator(
         at: url,
         includingPropertiesForKeys: [.isDirectoryKey]
@@ -122,34 +141,18 @@ func assetURLs(at url: URL) throws -> [URL] {
         return []
     }
 
-    return try dirEnumerator.filter { item -> Bool in
-        guard let fileUrl = item as? URL else {
-            return false
-        }
-        let attr = try fileUrl.resourceValues(forKeys: [
-            .isDirectoryKey,
-        ])
-        if !attr.isDirectory! {
-            return false
-        }
-        if !fileUrl.isAssetURL {
-            return false
-        }
-        guard !fileUrl.pathExtension.isEmpty else {
-            // probably a folder; keep recursing
-            return false
-        }
-        return true
-    }.map { item -> URL in
+    return dirEnumerator.map { item -> URL in
         item as! URL
+    }.filter { url -> Bool in
+        url.isDirectory && url.isAssetURL && !url.pathExtension.isEmpty
     }
 }
 
-func assets(in project: XcodeProject) throws -> [Resource] {
-    try project.files.filter { ref -> Bool in
+func assets(in project: XcodeProject) -> [Resource] {
+    project.files.filter { ref -> Bool in
         ref.kind == "folder.assetcatalog" || ref.url.pathExtension == "xcassets"
     }.flatMap { ref -> [Resource] in
-        try assetURLs(at: ref.url).map { assetUrl -> Resource in
+        assetURLs(at: ref.url).map { assetUrl -> Resource in
             Resource(name: assetUrl.deletingPathExtension().lastPathComponent,
                      fileName: nil)
         }
@@ -233,29 +236,14 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
         //         "Icon10@2x.png" and "Icon10@3x.png"
         //       this will result (as expected) in two different resources,
         //       however, these could be squashed into one (with additional variants)
-        let assetFiles: [Resource]
-        do {
-            assetFiles = try assets(in: project)
-        } catch {
-            fatalError("\(error)")
-        }
-        var res = resources(in: project) + assetFiles
+        var res = resources(in: project) + assets(in: project)
         for source in sourceFiles(in: project) {
-            var isDirectory: ObjCBool = false
-            guard FileManager.default.fileExists(atPath: source.path,
-                                                 isDirectory: &isDirectory),
-                !isDirectory.boolValue else {
-                continue
-            }
             let fileContents: String
             do {
                 // TODO: this is a potentially heavy operation, as we read in entire
                 //       file at once; consider alternatives (grep through Process?)
                 fileContents = try String(contentsOf: source.url)
             } catch {
-                #if DEBUG
-                    print(error)
-                #endif
                 continue
             }
             res = res.filter { resource -> Bool in
