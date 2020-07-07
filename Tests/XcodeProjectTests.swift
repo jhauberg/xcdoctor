@@ -10,40 +10,66 @@
 import Foundation
 import XCTest
 
+// note that paths in these tests assumes `$ swift test` from the root of the project;
+// it does _not_ work when run from Xcode; some might still pass, but most will fail
 class XcodeProjectTests: XCTestCase {
     func projectUrl(for defect: Defect) -> URL {
-        // note that this assumes `$ swift test` from the root of the project;
-        // it does not work when run from Xcode
         URL(fileURLWithPath: "Tests/Subjects/")
             .appendingPathComponent(
-                "\(defect)/xcdoctor.xcodeproj/project.pbxproj"
+                "\(defect)/xcdoctor.xcodeproj"
             )
     }
 
-    func testProjectNotFound() {
-        XCTAssertNil(XcodeProject(from:
-            // assuming this path does not exist!
-            URL(fileURLWithPath: "~/Some/Project.xcodeproj")))
+    func testProjectNotFoundInNonExistentPath() {
+        let result = XcodeProject.open(from: URL(fileURLWithPath: "~/Some/Project.xcodeproj"))
+        XCTAssertThrowsError(try result.get()) { error in
+            XCTAssertEqual(
+                error as! XcodeProjectError,
+                XcodeProjectError.notFound(amongFilesInDirectory: false)
+            )
+        }
+    }
+
+    func testProjectNotFoundInNonExistentDirectory() {
+        let result = XcodeProject.open(from: URL(fileURLWithPath: "~/Some/Place/"))
+        XCTAssertThrowsError(try result.get()) { error in
+            XCTAssertEqual(
+                error as! XcodeProjectError,
+                XcodeProjectError.notFound(amongFilesInDirectory: true)
+            )
+        }
+    }
+
+    func testProjectNotFoundInDirectory() {
+        // assumes this directory is kept rid of .xcodeprojs
+        let result = XcodeProject.open(from: URL(fileURLWithPath: "Tests/Subjects/"))
+        XCTAssertThrowsError(try result.get()) { error in
+            XCTAssertEqual(
+                error as! XcodeProjectError,
+                XcodeProjectError.notFound(amongFilesInDirectory: true)
+            )
+        }
     }
 
     func testProjectFound() {
-        let project = XcodeProject(
-            from: projectUrl(for: .nonExistentFiles)
-        )!
-        XCTAssertNotNil(project)
+        let result = XcodeProject.open(from: projectUrl(for: .nonExistentFiles))
+        XCTAssertNoThrow(try result.get())
     }
 
-    func testFileUrls() {
-        let project = XcodeProject(
-            from: projectUrl(for: .nonExistentFiles)
-        )!
+    func testFileReferenceResolution() {
+        let result = XcodeProject.open(from: projectUrl(for: .nonExistentFiles))
+        guard let project = try? result.get() else {
+            XCTFail(); return
+        }
         XCTAssert(project.files.count == 1)
+        // TODO: assert path is as expected
     }
 
     func testMissingFile() {
-        let project = XcodeProject(
-            from: projectUrl(for: .nonExistentFiles)
-        )!
+        let result = XcodeProject.open(from: projectUrl(for: .nonExistentFiles))
+        guard let project = try? result.get() else {
+            XCTFail(); return
+        }
         let diagnosis = examine(project: project, for: .nonExistentFiles)
         XCTAssertNotNil(diagnosis)
         XCTAssertNotNil(diagnosis!.cases)
@@ -51,9 +77,10 @@ class XcodeProjectTests: XCTestCase {
     }
 
     func testCorruptPlist() {
-        let project = XcodeProject(
-            from: projectUrl(for: .corruptPropertyLists)
-        )!
+        let result = XcodeProject.open(from: projectUrl(for: .corruptPropertyLists))
+        guard let project = try? result.get() else {
+            XCTFail(); return
+        }
         let diagnosis = examine(project: project, for: .corruptPropertyLists)
         XCTAssertNotNil(diagnosis)
         XCTAssertNotNil(diagnosis!.cases)
@@ -61,9 +88,10 @@ class XcodeProjectTests: XCTestCase {
     }
 
     func testDanglingFile() {
-        let project = XcodeProject(
-            from: projectUrl(for: .danglingFiles)
-        )!
+        let result = XcodeProject.open(from: projectUrl(for: .danglingFiles))
+        guard let project = try? result.get() else {
+            XCTFail(); return
+        }
         let diagnosis = examine(project: project, for: .danglingFiles)
         XCTAssertNotNil(diagnosis)
         XCTAssertNotNil(diagnosis!.cases)
