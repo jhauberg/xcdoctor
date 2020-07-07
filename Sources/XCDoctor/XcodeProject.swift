@@ -61,9 +61,9 @@ struct FileReference {
     }
 }
 
-public enum XcodeProjectError: Error {
+public enum XcodeProjectError: Error, Equatable {
     case incompatible(reason: String)
-    case notFound(among: [String]? = nil)
+    case notFound(amongFilesInDirectory: Bool) // param indicates whether directory was searched
 }
 
 public struct XcodeProject {
@@ -71,7 +71,7 @@ public struct XcodeProject {
         let projectUrl: URL
 
         if !FileManager.default.fileExists(atPath: url.standardized.path) {
-            return .failure(.notFound())
+            return .failure(.notFound(amongFilesInDirectory: url.hasDirectoryPath))
         }
 
         if !url.isDirectory {
@@ -87,7 +87,7 @@ public struct XcodeProject {
             }) {
                 projectUrl = url.appendingPathComponent(xcodeProjectFile)
             } else {
-                return .failure(.notFound(among: files))
+                return .failure(.notFound(amongFilesInDirectory: true))
             }
         } else {
             projectUrl = url

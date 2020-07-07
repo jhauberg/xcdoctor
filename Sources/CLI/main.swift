@@ -72,10 +72,10 @@ struct Doctor: ParsableCommand {
         case let .failure(error):
             let path = url.standardized.path
             switch error {
-            case .incompatible(let reason):
+            case let .incompatible(reason):
                 printdiag(text: "\(path): \(reason)")
-            case .notFound(let amongFiles):
-                if let _ = amongFiles {
+            case let .notFound(amongFilesInDirectory):
+                if amongFilesInDirectory {
                     printdiag(text: "\(path): no Xcode project found")
                 } else {
                     printdiag(text: "\(path): Xcode project not found")
