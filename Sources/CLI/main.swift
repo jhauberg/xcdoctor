@@ -56,52 +56,35 @@ struct Doctor: ParsableCommand {
     var verbose: Bool = false
 
     mutating func run() throws {
-        let searchUrl: URL
+        let url: URL
         if NSString(string: xcodeproj).isAbsolutePath {
-            searchUrl = URL(fileURLWithPath: xcodeproj)
+            url = URL(fileURLWithPath: xcodeproj)
         } else {
-            searchUrl = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            url = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
                 .appendingPathComponent(xcodeproj)
         }
 
-        let projectUrl: URL
-        if searchUrl.pathExtension != "xcodeproj", searchUrl.hasDirectoryPath {
-            let files = try FileManager.default.contentsOfDirectory(
-                atPath: searchUrl.standardized.path
-            )
-            if let xcodeProjectFile = files.first(where: { file -> Bool in
-                file.hasSuffix("xcodeproj")
-            }) {
-                projectUrl = searchUrl.appendingPathComponent(xcodeProjectFile)
-            } else {
-                printdiag(text: "\(searchUrl.standardized.path): no projects found")
-                throw ExitCode.failure
+        let project: XcodeProject
+        let result = XcodeProject.open(from: url)
+        switch result {
+        case let .success(proj):
+            project = proj
+        case let .failure(error):
+            let path = url.standardized.path
+            switch error {
+            case .incompatible(let reason):
+                printdiag(text: "\(path): \(reason)")
+            case .notFound(let amongFiles):
+                if let _ = amongFiles {
+                    printdiag(text: "\(path): no Xcode project found")
+                } else {
+                    printdiag(text: "\(path): Xcode project not found")
+                }
             }
-        } else {
-            projectUrl = searchUrl
-        }
 
-        if !FileManager.default.fileExists(atPath: projectUrl.standardized.path) {
-            printdiag(text: "\(projectUrl.standardized.path): project not found")
             throw ExitCode.failure
         }
 
-        if projectUrl.pathExtension != "xcodeproj" {
-            printdiag(text: "\(projectUrl.standardized.path): file is not an Xcode project")
-            throw ExitCode.failure
-        }
-
-        let pbxUrl = projectUrl.appendingPathComponent("project.pbxproj")
-
-        if !FileManager.default.fileExists(atPath: pbxUrl.standardized.path) {
-            printdiag(text: "\(projectUrl.standardized.path): unsupported Xcode project format")
-            throw ExitCode.failure
-        }
-
-        guard let project = XcodeProject(from: pbxUrl) else {
-            printdiag(text: "\(projectUrl.standardized.path): unsupported Xcode project format")
-            throw ExitCode.failure
-        }
         // order examinations based on importance, so that the most important is run last;
         // this may seem counter-intuitive, but in most cases, what you will read first
         // is actually the output that came last (especially for long/many diagnoses)
@@ -136,7 +119,6 @@ struct Doctor: ParsableCommand {
                 }
             }
         }
-
         throw ExitCode.success
     }
 }

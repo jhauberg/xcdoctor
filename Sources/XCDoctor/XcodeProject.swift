@@ -61,51 +61,69 @@ struct FileReference {
     }
 }
 
+public enum XcodeProjectError: Error {
+    case incompatible(reason: String)
+    case notFound(among: [String]? = nil)
+}
+
 public struct XcodeProject {
-    let pbxUrl: URL
+    public static func open(from url: URL) -> Result<XcodeProject, XcodeProjectError> {
+        let projectUrl: URL
+
+        if !FileManager.default.fileExists(atPath: url.standardized.path) {
+            return .failure(.notFound())
+        }
+
+        if !url.isDirectory {
+            return .failure(.incompatible(reason: "not an Xcode project"))
+        }
+
+        if url.pathExtension != "xcodeproj" {
+            let files = try! FileManager.default.contentsOfDirectory(
+                atPath: url.standardized.path
+            )
+            if let xcodeProjectFile = files.first(where: { file -> Bool in
+                file.hasSuffix("xcodeproj")
+            }) {
+                projectUrl = url.appendingPathComponent(xcodeProjectFile)
+            } else {
+                return .failure(.notFound(among: files))
+            }
+        } else {
+            projectUrl = url
+        }
+
+        let pbxUrl = projectUrl.appendingPathComponent("project.pbxproj")
+
+        if !FileManager.default.fileExists(atPath: pbxUrl.standardized.path) {
+            return .failure(.incompatible(reason: "unsupported Xcode project format"))
+        }
+
+        do {
+            var format = PropertyListSerialization.PropertyListFormat.openStep
+            guard let plist = try PropertyListSerialization.propertyList(
+                from: try Data(contentsOf: pbxUrl),
+                options: .mutableContainersAndLeaves,
+                format: &format
+            ) as? [String: Any] else {
+                return .failure(.incompatible(reason: "unsupported Xcode project format"))
+            }
+            let rootUrl = pbxUrl // for example, ~/Development/My/Project.xcodeproj/project.pbxproj
+                .deletingLastPathComponent() //  ~/Development/My/Project.xcodeproj/
+                .deletingLastPathComponent() //  ~/Development/My/
+            return .success(XcodeProject(locatedAtRootURL: rootUrl, objectGraph: plist))
+        } catch {
+            return .failure(.incompatible(reason: "unsupported Xcode project format"))
+        }
+    }
+
+    private init(locatedAtRootURL url: URL, objectGraph: [String: Any]) {
+        rootUrl = url
+        propertyList = objectGraph
+        resolve()
+    }
+
     let rootUrl: URL
-
-    var files: [FileReference] {
-        fileRefs
-    }
-
-    var groups: [GroupReference] {
-        groupRefs
-    }
-
-    func referencesAssetAsAppIcon(named asset: String) -> Bool {
-        for elem in buildConfigs {
-            if let config = elem.value as? [String: Any] {
-                if let settings = config["buildSettings"] as? [String: Any] {
-                    if let appIconSetting =
-                        settings["ASSETCATALOG_COMPILER_APPICON_NAME"] as? String {
-                        if appIconSetting == asset {
-                            return true
-                        }
-                    }
-                }
-            }
-        }
-        return false
-    }
-
-    func referencesPropertyListInfoPlist(named file: FileReference) -> Bool {
-        for elem in buildConfigs {
-            if let config = elem.value as? [String: Any] {
-                if let settings = config["buildSettings"] as? [String: Any] {
-                    if let infoPlistSetting = settings["INFOPLIST_FILE"] as? String {
-                        let setting = infoPlistSetting.replacingOccurrences(
-                            of: "$(SRCROOT)", with: rootUrl.standardized.path
-                        )
-                        if file.url.standardized.path.hasSuffix(setting) {
-                            return true
-                        }
-                    }
-                }
-            }
-        }
-        return false
-    }
 
     private var fileRefs: [FileReference] = []
     private var groupRefs: [GroupReference] = []
@@ -113,24 +131,12 @@ public struct XcodeProject {
     private let propertyList: [String: Any]
     private var buildConfigs: [String: Any] = [:]
 
-    public init?(from url: URL) {
-        do {
-            let data = try Data(contentsOf: url)
-            var format = PropertyListSerialization.PropertyListFormat.openStep
-            let plist = try PropertyListSerialization.propertyList(
-                from: data,
-                options: .mutableContainersAndLeaves,
-                format: &format
-            )
-            propertyList = plist as! [String: Any]
-            pbxUrl = url
-            rootUrl = pbxUrl // for example,    ~/Development/My/Project.xcodeproj/project.pbxproj
-                .deletingLastPathComponent() // ~/Development/My/Project.xcodeproj/
-                .deletingLastPathComponent() // ~/Development/My/
-            resolve()
-        } catch {
-            return nil
-        }
+    var files: [FileReference] {
+        fileRefs
+    }
+
+    var groups: [GroupReference] {
+        groupRefs
     }
 
     private mutating func resolve() {
@@ -336,5 +342,39 @@ public struct XcodeProject {
             let children = groupObj["children"] as! [String]
             return children.contains(reference)
         }
+    }
+
+    func referencesAssetAsAppIcon(named asset: String) -> Bool {
+        for elem in buildConfigs {
+            if let config = elem.value as? [String: Any] {
+                if let settings = config["buildSettings"] as? [String: Any] {
+                    if let appIconSetting =
+                        settings["ASSETCATALOG_COMPILER_APPICON_NAME"] as? String {
+                        if appIconSetting == asset {
+                            return true
+                        }
+                    }
+                }
+            }
+        }
+        return false
+    }
+
+    func referencesPropertyListInfoPlist(named file: FileReference) -> Bool {
+        for elem in buildConfigs {
+            if let config = elem.value as? [String: Any] {
+                if let settings = config["buildSettings"] as? [String: Any] {
+                    if let infoPlistSetting = settings["INFOPLIST_FILE"] as? String {
+                        let setting = infoPlistSetting.replacingOccurrences(
+                            of: "$(SRCROOT)", with: rootUrl.standardized.path
+                        )
+                        if file.url.standardized.path.hasSuffix(setting) {
+                            return true
+                        }
+                    }
+                }
+            }
+        }
+        return false
     }
 }
