@@ -240,12 +240,30 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
         for source in sourceFiles(in: project) {
             let fileContents: String
             do {
-                // TODO: this is a potentially heavy operation, as we read in entire
-                //       file at once; consider alternatives (grep through Process?)
                 fileContents = try String(contentsOf: source.url)
             } catch {
                 continue
             }
+            // TODO: this ideally only applies to *certain* source-files;
+            //       e.g. only actual code files
+            //       similarly, xml has another kind of comment which should also be stripped
+            //       but, again, only for certain kinds of files
+            //       for now, this just applies to any file we search through
+            let strippedFileContents = strip(text: fileContents, matchingExpressions: [
+                // note prioritized order: strip block comments before line comments
+                // note the #..# to designate a raw string, allowing the \* literal
+                // swiftformat:disable all
+                try! NSRegularExpression(pattern:
+                    #"/\*(?:.|[\n])*?\*/"#),
+                try! NSRegularExpression(pattern:
+                    "(?:[^:]|^)" + // avoid matching URLs in code, but anything else goes
+                    "//" +         // starting point of a single-line comment
+                    ".*?" +        // anything following
+                    "(?:\n|$)",    // until reaching end of string or a newline
+                                         options: [.anchorsMatchLines]),
+                // swiftformat:enable all
+            ])
+
             res = res.filter { resource -> Bool in
                 for resourceName in resource.nameVariants {
                     let searchStrings: [String]
@@ -267,15 +285,10 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
                         // the end, which should work out no matter the destination, while
                         // still being decently specific; e.g.
                         //      `/monster.png"`
-                        // TODO: this does not take commented lines into account
-                        //       - we could expand to support // comments; e.g.
-                        //         if resourceName occurs on a line preceded by "//"
-                        //         anywhere previously, then it doesn't count
-                        //         /**/ comments are much trickier, though
                         searchStrings = ["\"\(resourceName)\"", "/\(resourceName)\""]
                     }
                     for searchString in searchStrings {
-                        if fileContents.contains(searchString) {
+                        if strippedFileContents.contains(searchString) {
                             return false // resource seems to be used; don't search further for this
                         }
                     }
@@ -312,4 +325,16 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
         }
     }
     return nil
+}
+
+func strip(text: String, matchingExpressions expressions: [NSRegularExpression]) -> String {
+    var str = text
+    for expr in expressions {
+        var match = expr.firstMatch(in: str, range: NSRange(location: 0, length: str.utf16.count))
+        while match != nil {
+            str.replaceSubrange(Range(match!.range, in: str)!, with: "")
+            match = expr.firstMatch(in: str, range: NSRange(location: 0, length: str.utf16.count))
+        }
+    }
+    return str
 }
