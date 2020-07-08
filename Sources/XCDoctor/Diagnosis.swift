@@ -165,7 +165,7 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
         let filePaths = nonExistentFilePaths(in: project)
         if !filePaths.isEmpty {
             return Diagnosis(
-                conclusion: "non-existent file(s) referenced in project",
+                conclusion: "non-existent files",
                 // TODO: this text should be wrapped at X columns; can do manually, but ...
                 help: """
                 These files might have been moved or removed from the filesystem.
@@ -179,7 +179,7 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
         let dirPaths = nonExistentGroupPaths(in: project)
         if !dirPaths.isEmpty {
             return Diagnosis(
-                conclusion: "non-existent path(s) referenced in groups",
+                conclusion: "non-existent group paths",
                 help: """
                 If not corrected, these paths can cause tools to erroneously
                 map children of each group to non-existent files.
@@ -212,7 +212,7 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
         }
         if !corruptedFilePaths.isEmpty {
             return Diagnosis(
-                conclusion: "corrupt plist(s)",
+                conclusion: "corrupted plists",
                 help: """
                 These files must be fixed manually using any plain-text editor.
                 """,
@@ -223,7 +223,7 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
         let filePaths = danglingFilePaths(in: project)
         if !filePaths.isEmpty {
             return Diagnosis(
-                conclusion: "file(s) not included in any target",
+                conclusion: "files not included in any target",
                 help: """
                 These files might not be used; consider whether they should be removed.
                 """,
@@ -307,14 +307,11 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
         }
         if !res.isEmpty {
             return Diagnosis(
-                conclusion: "unused resource(s)",
+                conclusion: "unused resources",
                 help: """
-                These resources might not be used; consider whether they should be removed.
-                Note that this diagnosis is prone to produce false-positives as it can not
-                realistically detect all usages with certainty.
-                For example, assets specified through external references, or by dynamically
-                constructed names, are likely to be reported as unused resources, even though
-                they are actually used.
+                These files might not be used; consider whether they should be removed.
+                Note that this diagnosis is prone to false-positives as it can't
+                realistically detect all usage patterns with certainty.
                 """,
                 cases: res.map { resource -> String in
                     // prefer name including extension, as this can help distinguish
