@@ -360,7 +360,7 @@ public struct XcodeProject {
         return false
     }
 
-    func referencesPropertyListInfoPlist(named file: FileReference) -> Bool {
+    func referencesPropertyListAsInfoPlist(named file: FileReference) -> Bool {
         for elem in buildConfigs {
             if let config = elem.value as? [String: Any] {
                 if let settings = config["buildSettings"] as? [String: Any] {

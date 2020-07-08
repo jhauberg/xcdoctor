@@ -59,7 +59,7 @@ func danglingFilePaths(in project: XcodeProject) -> [String] {
     }.filter { ref -> Bool in
         // handle the special-case Info.plist
         if ref.kind == "text.plist.xml" || ref.url.pathExtension == "plist" {
-            return !project.referencesPropertyListInfoPlist(named: ref)
+            return !project.referencesPropertyListAsInfoPlist(named: ref)
         }
         return true
     }.map { ref -> String in
