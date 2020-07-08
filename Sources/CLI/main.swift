@@ -65,23 +65,20 @@ struct Doctor: ParsableCommand {
         }
 
         let project: XcodeProject
-        let result = XcodeProject.open(from: url)
-        switch result {
-        case let .success(proj):
-            project = proj
+        switch XcodeProject.open(from: url) {
+        case let .success(xcodeProject):
+            project = xcodeProject
         case let .failure(error):
-            let path = url.standardized.path
             switch error {
             case let .incompatible(reason):
-                printdiag(text: "\(path): \(reason)")
+                printdiag(text: "\(url.standardized.path): \(reason)")
             case let .notFound(amongFilesInDirectory):
                 if amongFilesInDirectory {
-                    printdiag(text: "\(path): no Xcode project found")
+                    printdiag(text: "\(url.standardized.path): no Xcode project found")
                 } else {
-                    printdiag(text: "\(path): Xcode project not found")
+                    printdiag(text: "\(url.standardized.path): Xcode project not found")
                 }
             }
-
             throw ExitCode.failure
         }
 
