@@ -62,7 +62,13 @@ class XcodeProjectTests: XCTestCase {
             XCTFail(); return
         }
         XCTAssert(project.files.count == 1)
-        // TODO: assert path is as expected
+        XCTAssertEqual(
+            project.files.first!.url,
+            projectUrl(for: .nonExistentFiles)
+                .deletingLastPathComponent()
+                .appendingPathComponent("xcdoctor")
+                .appendingPathComponent("main.swift")
+        )
     }
 
     func testMissingFile() {
