@@ -93,8 +93,8 @@ struct Doctor: ParsableCommand {
         // so, for example, nonExistentFiles should be cleared before danglingFiles,
         // as that likely has a cascading effect throughout previous diagnoses
         let conditions: [Defect] = [
-            .danglingFiles,
             .unusedResources,
+            .danglingFiles,
             .corruptPropertyLists,
             .nonExistentFiles,
             .nonExistentPaths,
