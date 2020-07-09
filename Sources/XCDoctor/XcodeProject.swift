@@ -32,6 +32,8 @@ let sourceTypes: [(String, [String])] = [
 struct GroupReference {
     let url: URL
     let name: String
+    let isWithFolder: Bool
+    let hasChildren: Bool
 
     var path: String {
         url.standardized.relativePath
@@ -159,9 +161,7 @@ public struct XcodeProject {
         let groupReferences = objects.filter { (elem) -> Bool in
             if let obj = elem.value as? [String: Any] {
                 if let isa = obj["isa"] as? String,
-                    isa == "PBXGroup" || isa == "PBXVariantGroup",
-                    let children = obj["children"] as? [String],
-                    !children.isEmpty {
+                    isa == "PBXGroup" || isa == "PBXVariantGroup" {
                     return true
                 }
             }
@@ -262,13 +262,17 @@ public struct XcodeProject {
             )
         }
 
-        // TODO: this is almost completely duplicated from file traversal, though with
-        //       a difference of path being optional
+        // TODO: almost completely duplicated from file traversal; at least find a way
+        //       to refactor and consolidate the sourceTree switch construct
         for group in groupReferences {
             let obj = group.value as! [String: Any]
-            guard var path = obj["path"] as? String else {
+            guard var path = obj["path"] as? String,
+                let children = obj["children"] as? [String] else {
                 continue
             }
+//            let pathOnDisk = obj["path"] as? String
+//            var path = pathOnDisk ?? obj["name"] as? String ?? ""
+//            let isNonFolderGroup = pathOnDisk == nil
             let sourceTree = obj["sourceTree"] as! String
             switch sourceTree {
             case "":
@@ -305,6 +309,7 @@ public struct XcodeProject {
                         }
                     } else {
                         // non-folder group or root of hierarchy
+                        // TODO: attach name to path if starting group is without folder
                     }
                     parentReferences = parents(of: p.key, in: groupReferences)
                 }
@@ -312,6 +317,7 @@ public struct XcodeProject {
                 fatalError()
             }
             let directoryUrl = resolvePath(path)
+            // TODO: if without folder we should not attach root url nor make file url
             let name: String
             if let named = obj["name"] as? String {
                 name = named
@@ -322,7 +328,9 @@ public struct XcodeProject {
             groupRefs.append(
                 GroupReference(
                     url: directoryUrl,
-                    name: name
+                    name: name,
+                    isWithFolder: true, // TODO: currently non-folder groups are just skipped entirely
+                    hasChildren: !children.isEmpty
                 )
             )
         }

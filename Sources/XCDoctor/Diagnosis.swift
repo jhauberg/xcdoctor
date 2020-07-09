@@ -14,6 +14,7 @@ public enum Defect {
     case danglingFiles
     case unusedResources
     case nonExistentPaths
+    case emptyGroups
 }
 
 public struct Diagnosis {
@@ -44,6 +45,21 @@ func nonExistentGroups(in project: XcodeProject) -> [GroupReference] {
 func nonExistentGroupPaths(in project: XcodeProject) -> [String] {
     nonExistentGroups(in: project).map { ref -> String in
         "\(ref.path): Path referenced in group \"\(ref.name)\""
+    }
+}
+
+func emptyGroups(in project: XcodeProject) -> [GroupReference] {
+    // TODO: this does not include non-folder groups
+    project.groups.filter { ref -> Bool in
+        !ref.hasChildren
+    }
+}
+
+func emptyGroupPaths(in project: XcodeProject) -> [String] {
+    emptyGroups(in: project).map { ref -> String in
+        // TODO: we want the visual path here; e.g. the tree as seen in Xcode;
+        //       this can include both folder and non-folder groups
+        "\(ref.name)"
     }
 }
 
@@ -319,6 +335,14 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
                     resource.fileName ?? resource.name
                 }
             )
+        }
+    case .emptyGroups:
+        let groupPaths = emptyGroupPaths(in: project)
+        if !groupPaths.isEmpty {
+            return Diagnosis(
+                conclusion: "empty groups",
+                help: "smelly",
+                cases: groupPaths)
         }
     }
     return nil
