@@ -8,18 +8,57 @@
 
 import Foundation
 
+/**
+ Represents an undesired condition for an Xcode project.
+ */
 public enum Defect {
+    /**
+     A condition that applies if any file reference resolves to a file that does not exist on disk.
+     */
     case nonExistentFiles
+    /**
+     A condition that applies if any property-list (.plist) fails to convert to a
+     serialized representation.
+     */
     case corruptPropertyLists
+    /**
+     A condition that applies if any source-file does not have target membership.
+     */
     case danglingFiles
+    /**
+     A condition that applies if any non-source-file (including resources in assetcatalogs)
+     does not appear to be used in any source-file.
+
+     Whether or not a resource is deemed to be in use relies on simple pattern matching
+     and is prone to both false-positives and missed cases.
+     */
     case unusedResources
+    /**
+     A condition that applies if any groups (including non-folder groups) resolves to
+     a path that does not exist on disk.
+     */
     case nonExistentPaths
+    /**
+     A condition that applies if any group contains zero children (files or groups).
+     */
     case emptyGroups
 }
 
+/**
+ Represents a diagnosis of a defect in an Xcode project.
+ */
 public struct Diagnosis {
+    /**
+     Represents a conclusive message for the result of this diagnosis.
+     */
     public let conclusion: String
+    /**
+     Represents a helpful message on how to go about dealing with this diagnosis.
+     */
     public let help: String?
+    /**
+     Represents a set of concrete cases that are directly linked to causing this diagnosis.
+     */
     public let cases: [String]?
 }
 
