@@ -77,13 +77,16 @@ func nonExistentFilePaths(in project: XcodeProject) -> [String] {
 
 func nonExistentGroups(in project: XcodeProject) -> [GroupReference] {
     project.groups.filter { ref -> Bool in
-        !FileManager.default.fileExists(atPath: ref.path)
+        if let path = ref.path {
+            return !FileManager.default.fileExists(atPath: path)
+        }
+        return false
     }
 }
 
 func nonExistentGroupPaths(in project: XcodeProject) -> [String] {
     nonExistentGroups(in: project).map { ref -> String in
-        "\(ref.path): Path referenced in group \"\(ref.name)\""
+        "\(ref.path!): \"\(ref.projectUrl.absoluteString)\""
     }
 }
 
@@ -98,7 +101,7 @@ func emptyGroupPaths(in project: XcodeProject) -> [String] {
     emptyGroups(in: project).map { ref -> String in
         // TODO: we want the visual path here; e.g. the tree as seen in Xcode;
         //       this can include both folder and non-folder groups
-        "\(ref.name)"
+        "\(ref.projectUrl.absoluteString)"
     }
 }
 
@@ -381,7 +384,8 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
             return Diagnosis(
                 conclusion: "empty groups",
                 help: "smelly",
-                cases: groupPaths)
+                cases: groupPaths
+            )
         }
     }
     return nil

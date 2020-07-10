@@ -125,8 +125,13 @@ class XcodeProjectTests: XCTestCase {
             XCTFail(); return
         }
         let diagnosis = examine(project: project, for: condition)
-        XCTAssertNotNil(diagnosis)
-        XCTAssertNotNil(diagnosis!.cases)
-        XCTAssert(diagnosis!.cases!.count == 2)
+        guard let cases = diagnosis?.cases else {
+            XCTFail(); return
+        }
+        guard cases.count == 2 else {
+            XCTFail(); return
+        }
+        XCTAssert(cases.contains("xcdoctor/a"))
+        XCTAssert(cases.contains("xcdoctor/b/c/d"))
     }
 }

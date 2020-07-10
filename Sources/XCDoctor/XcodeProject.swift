@@ -30,18 +30,19 @@ let sourceTypes: [(String, [String])] = [
 ]
 
 struct GroupReference {
-    let url: URL
+    let url: URL?
+    let projectUrl: URL // TODO: naming, this is the visual tree as seen in Xcode
     let name: String
-    let isWithFolder: Bool
     let hasChildren: Bool
 
-    var path: String {
-        url.standardized.relativePath
+    var path: String? {
+        url?.standardized.relativePath
     }
 }
 
 struct FileReference {
     let url: URL
+    // TODO: could add visual/project url here as well to help locating a non-existent file in project
     let kind: String
     let hasTargetMembership: Bool
 
@@ -141,6 +142,86 @@ public struct XcodeProject {
         groupRefs
     }
 
+    private func resolveProjectURL(ref: Dictionary<String, Any>.Element,
+                                   groups: [String: Any]) -> URL? {
+        guard let obj = ref.value as? [String: Any] else {
+            return nil
+        }
+        guard var path = obj["name"] as? String ?? obj["path"] as? String else {
+            return nil
+        }
+
+        var parentReferences = parents(of: ref.key, in: groups)
+        while !parentReferences.isEmpty {
+            assert(parentReferences.count == 1)
+            let p = parentReferences.first!
+            let groupObj = p.value as! [String: Any]
+            if let parentPath = groupObj["name"] as? String ?? groupObj["path"] as? String,
+                !parentPath.isEmpty {
+                path = "\(parentPath)/\(path)"
+            }
+            parentReferences = parents(of: p.key, in: groups)
+        }
+
+        return URL(string: path)
+    }
+
+    private func resolveFileURL(ref: Dictionary<String, Any>.Element,
+                                groups: [String: Any]) -> URL? {
+        guard let obj = ref.value as? [String: Any] else {
+            return nil
+        }
+        guard let sourceTree = obj["sourceTree"] as? String,
+            var path = obj["path"] as? String else {
+            return nil
+        }
+        switch sourceTree {
+        case "":
+            // skip this file
+            return nil
+        case "SDKROOT":
+            // skip this file
+            return nil
+        case "DEVELOPER_DIR":
+            // skip this file
+            return nil
+        case "BUILT_PRODUCTS_DIR":
+            // skip this file
+            return nil
+        case "SOURCE_ROOT":
+            // leave path unchanged
+            break
+        case "<absolute>":
+            // leave path unchanged
+            break
+        case "<group>":
+            var parentReferences = parents(of: ref.key, in: groups)
+            while !parentReferences.isEmpty {
+                assert(parentReferences.count == 1)
+                let p = parentReferences.first!
+                let groupObj = p.value as! [String: Any]
+                if let parentPath = groupObj["path"] as? String, !parentPath.isEmpty {
+                    path = "\(parentPath)/\(path)"
+                    let groupSourceTree = groupObj["sourceTree"] as! String
+                    if groupSourceTree == "SOURCE_ROOT" {
+                        // don't resolve further back, even if
+                        // this group is a child of another group
+                        break
+                    }
+                } else {
+                    // non-folder group or root of hierarchy
+                }
+                parentReferences = parents(of: p.key, in: groups)
+            }
+        default:
+            fatalError()
+        }
+        if NSString(string: path).isAbsolutePath {
+            return URL(fileURLWithPath: path)
+        }
+        return rootUrl.appendingPathComponent(path)
+    }
+
     private mutating func resolve() {
         fileRefs.removeAll()
         groupRefs.removeAll()
@@ -189,53 +270,12 @@ public struct XcodeProject {
             return false
         }
         for file in fileReferences {
+            guard let fileUrl = resolveFileURL(ref: file, groups: groupReferences) else {
+                continue
+            }
             let obj = file.value as! [String: Any]
-            var path = obj["path"] as! String
-            let sourceTree = obj["sourceTree"] as! String
             let potentialFileType = obj["lastKnownFileType"] as? String
             let explicitfileType = obj["explicitFileType"] as? String
-            switch sourceTree {
-            case "":
-                // skip this file
-                continue
-            case "SDKROOT":
-                // skip this file
-                continue
-            case "DEVELOPER_DIR":
-                // skip this file
-                continue
-            case "BUILT_PRODUCTS_DIR":
-                // skip this file
-                continue
-            case "SOURCE_ROOT":
-                // leave path unchanged
-                break
-            case "<absolute>":
-                // leave path unchanged
-                break
-            case "<group>":
-                var parentReferences = parents(of: file.key, in: groupReferences)
-                while !parentReferences.isEmpty {
-                    assert(parentReferences.count == 1)
-                    let p = parentReferences.first!
-                    let groupObj = p.value as! [String: Any]
-                    if let parentPath = groupObj["path"] as? String, !parentPath.isEmpty {
-                        path = "\(parentPath)/\(path)"
-                        let groupSourceTree = groupObj["sourceTree"] as! String
-                        if groupSourceTree == "SOURCE_ROOT" {
-                            // don't resolve further back, even if
-                            // this group is a child of another group
-                            break
-                        }
-                    } else {
-                        // non-folder group or root of hierarchy
-                    }
-                    parentReferences = parents(of: p.key, in: groupReferences)
-                }
-            default:
-                fatalError()
-            }
-            let fileUrl = resolvePath(path)
             var isReferencedAsBuildFile: Bool = false
             if buildReferences.contains(file.key) {
                 // file is directly referenced as a build file
@@ -261,86 +301,25 @@ public struct XcodeProject {
                 )
             )
         }
-
-        // TODO: almost completely duplicated from file traversal; at least find a way
-        //       to refactor and consolidate the sourceTree switch construct
         for group in groupReferences {
             let obj = group.value as! [String: Any]
-            guard var path = obj["path"] as? String,
-                let children = obj["children"] as? [String] else {
+            guard let children = obj["children"] as? [String] else {
                 continue
             }
-//            let pathOnDisk = obj["path"] as? String
-//            var path = pathOnDisk ?? obj["name"] as? String ?? ""
-//            let isNonFolderGroup = pathOnDisk == nil
-            let sourceTree = obj["sourceTree"] as! String
-            switch sourceTree {
-            case "":
-                // skip this file
+            guard let projectUrl = resolveProjectURL(ref: group, groups: groupReferences) else {
                 continue
-            case "SDKROOT":
-                // skip this file
-                continue
-            case "DEVELOPER_DIR":
-                // skip this file
-                continue
-            case "BUILT_PRODUCTS_DIR":
-                // skip this file
-                continue
-            case "SOURCE_ROOT":
-                // leave path unchanged
-                break
-            case "<absolute>":
-                // leave path unchanged
-                break
-            case "<group>":
-                var parentReferences = parents(of: group.key, in: groupReferences)
-                while !parentReferences.isEmpty {
-                    assert(parentReferences.count == 1)
-                    let p = parentReferences.first!
-                    let groupObj = p.value as! [String: Any]
-                    if let parentPath = groupObj["path"] as? String, !parentPath.isEmpty {
-                        path = "\(parentPath)/\(path)"
-                        let groupSourceTree = groupObj["sourceTree"] as! String
-                        if groupSourceTree == "SOURCE_ROOT" {
-                            // don't resolve further back, even if
-                            // this group is a child of another group
-                            break
-                        }
-                    } else {
-                        // non-folder group or root of hierarchy
-                        // TODO: attach name to path if starting group is without folder
-                    }
-                    parentReferences = parents(of: p.key, in: groupReferences)
-                }
-            default:
-                fatalError()
             }
-            let directoryUrl = resolvePath(path)
-            // TODO: if without folder we should not attach root url nor make file url
-            let name: String
-            if let named = obj["name"] as? String {
-                name = named
-            } else {
-                // grab path as-is, unresolved
-                name = obj["path"] as! String
-            }
+            let name = obj["name"] as? String ?? obj["path"] as? String ?? "<unknown>"
+            let directoryUrl = resolveFileURL(ref: group, groups: groupReferences)
             groupRefs.append(
                 GroupReference(
                     url: directoryUrl,
+                    projectUrl: projectUrl,
                     name: name,
-                    isWithFolder: true, // TODO: currently non-folder groups are just skipped entirely
                     hasChildren: !children.isEmpty
                 )
             )
         }
-    }
-
-    private func resolvePath(_ path: String) -> URL {
-        if NSString(string: path).isAbsolutePath {
-            return URL(fileURLWithPath: path)
-        }
-        return rootUrl.appendingPathComponent(path)
     }
 
     private func parents(of reference: String, in groups: [String: Any])
