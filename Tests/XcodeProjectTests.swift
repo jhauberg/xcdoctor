@@ -13,7 +13,7 @@ import XCTest
 // note that paths in these tests assumes `$ swift test` from the root of the project;
 // it does _not_ work when run from Xcode; some might still pass, but most will fail
 class XcodeProjectTests: XCTestCase {
-    func projectUrl(for defect: Defect) -> URL {
+    private func projectUrl(for defect: Defect) -> URL {
         URL(fileURLWithPath: "Tests/Subjects/")
             .appendingPathComponent(
                 "\(defect)/xcdoctor.xcodeproj"
@@ -57,14 +57,15 @@ class XcodeProjectTests: XCTestCase {
     }
 
     func testFileReferenceResolution() {
-        let result = XcodeProject.open(from: projectUrl(for: .nonExistentFiles))
+        let condition: Defect = .nonExistentFiles
+        let result = XcodeProject.open(from: projectUrl(for: condition))
         guard let project = try? result.get() else {
             XCTFail(); return
         }
         XCTAssert(project.files.count == 1)
         XCTAssertEqual(
             project.files.first!.url,
-            projectUrl(for: .nonExistentFiles)
+            projectUrl(for: condition)
                 .deletingLastPathComponent()
                 .appendingPathComponent("xcdoctor")
                 .appendingPathComponent("main.swift")
@@ -83,22 +84,24 @@ class XcodeProjectTests: XCTestCase {
     }
 
     func testCorruptPlist() {
-        let result = XcodeProject.open(from: projectUrl(for: .corruptPropertyLists))
+        let condition: Defect = .corruptPropertyLists
+        let result = XcodeProject.open(from: projectUrl(for: condition))
         guard let project = try? result.get() else {
             XCTFail(); return
         }
-        let diagnosis = examine(project: project, for: .corruptPropertyLists)
+        let diagnosis = examine(project: project, for: condition)
         XCTAssertNotNil(diagnosis)
         XCTAssertNotNil(diagnosis!.cases)
         XCTAssert(diagnosis!.cases!.count == 1)
     }
 
     func testDanglingFile() {
-        let result = XcodeProject.open(from: projectUrl(for: .danglingFiles))
+        let condition: Defect = .danglingFiles
+        let result = XcodeProject.open(from: projectUrl(for: condition))
         guard let project = try? result.get() else {
             XCTFail(); return
         }
-        let diagnosis = examine(project: project, for: .danglingFiles)
+        let diagnosis = examine(project: project, for: condition)
         XCTAssertNotNil(diagnosis)
         XCTAssertNotNil(diagnosis!.cases)
         XCTAssert(diagnosis!.cases!.count == 1)
