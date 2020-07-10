@@ -91,7 +91,6 @@ func nonExistentGroupPaths(in project: XcodeProject) -> [String] {
 }
 
 func emptyGroups(in project: XcodeProject) -> [GroupReference] {
-    // TODO: this does not include non-folder groups
     project.groups.filter { ref -> Bool in
         !ref.hasChildren
     }
@@ -99,8 +98,6 @@ func emptyGroups(in project: XcodeProject) -> [GroupReference] {
 
 func emptyGroupPaths(in project: XcodeProject) -> [String] {
     emptyGroups(in: project).map { ref -> String in
-        // TODO: we want the visual path here; e.g. the tree as seen in Xcode;
-        //       this can include both folder and non-folder groups
         "\(ref.projectUrl.absoluteString)"
     }
 }
@@ -238,6 +235,19 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
         if !dirPaths.isEmpty {
             return Diagnosis(
                 conclusion: "non-existent group paths",
+                // TODO: word this differently; a non-existent path is typically harmless:
+                //
+                //       "This is typically seen in projects under version-control, where a
+                //       contributor has this folder on their local copy, but, if empty,
+                //       is not added to version-control, leaving other contributors with a group
+                //       in Xcode, but no folder on disk to go with it."
+                //
+                //       however, there's also another case where occurs:
+                //       this is similarly harmless (typically), but is objectively a project smell:
+                //       if moving things around/messing with project files directly; e.g.
+                //       a group is both named and pathed (incorrectly), with child groups
+                //       overriding the incorrect path by using SOURCE_ROOT or similar
+                //       so ultimately everything works fine in Xcode, even though there is a bad path
                 help: """
                 If not corrected, these paths can cause tools to erroneously
                 map children of each group to non-existent files.
