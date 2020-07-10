@@ -383,7 +383,9 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
         if !groupPaths.isEmpty {
             return Diagnosis(
                 conclusion: "empty groups",
-                help: "smelly",
+                help: """
+                These groups might be redundant; consider whether they should be removed.
+                """,
                 cases: groupPaths
             )
         }
