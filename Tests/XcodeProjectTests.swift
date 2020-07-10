@@ -83,6 +83,17 @@ class XcodeProjectTests: XCTestCase {
         XCTAssert(diagnosis!.cases!.count == 1)
     }
 
+    func testMissingFolder() {
+        let result = XcodeProject.open(from: projectUrl(for: .nonExistentPaths))
+        guard let project = try? result.get() else {
+            XCTFail(); return
+        }
+        let diagnosis = examine(project: project, for: .nonExistentPaths)
+        XCTAssertNotNil(diagnosis)
+        XCTAssertNotNil(diagnosis!.cases)
+        XCTAssert(diagnosis!.cases!.count == 1)
+    }
+
     func testCorruptPlist() {
         let condition: Defect = .corruptPropertyLists
         let result = XcodeProject.open(from: projectUrl(for: condition))
