@@ -103,4 +103,16 @@ class XcodeProjectTests: XCTestCase {
         XCTAssertNotNil(diagnosis!.cases)
         XCTAssert(diagnosis!.cases!.count == 1)
     }
+
+    func testEmptyGroups() {
+        let condition: Defect = .emptyGroups
+        let result = XcodeProject.open(from: projectUrl(for: condition))
+        guard let project = try? result.get() else {
+            XCTFail(); return
+        }
+        let diagnosis = examine(project: project, for: condition)
+        XCTAssertNotNil(diagnosis)
+        XCTAssertNotNil(diagnosis!.cases)
+        XCTAssert(diagnosis!.cases!.count == 2)
+    }
 }
