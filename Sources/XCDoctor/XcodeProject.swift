@@ -49,7 +49,7 @@ struct GroupReference {
 struct FileReference {
     let url: URL
     // TODO: could add visual/project url here as well to help locating a non-existent file in project
-    let kind: String
+    let kind: String?
     let hasTargetMembership: Bool
 
     var path: String {
@@ -179,6 +179,7 @@ public struct XcodeProject {
             }
             let potentialFileType = file.properties["lastKnownFileType"] as? String
             let explicitfileType = file.properties["explicitFileType"] as? String
+            let fileType = explicitfileType ?? potentialFileType
             var isReferencedAsBuildFile: Bool = false
             if buildFileReferences.contains(file.id) {
                 // file is directly referenced as a build file
@@ -197,7 +198,7 @@ public struct XcodeProject {
             fileRefs.append(
                 FileReference(
                     url: fileUrl,
-                    kind: explicitfileType ?? potentialFileType ?? "unknown",
+                    kind: fileType,
                     hasTargetMembership: isReferencedAsBuildFile
                 )
             )
