@@ -208,9 +208,10 @@ public struct XcodeProject {
                 let projectUrl = resolveProjectURL(object: group, groups: groupItems) else {
                 continue
             }
-            let name = group.properties["name"] as? String ??
-                group.properties["path"] as? String ??
-                "<unknown>"
+            guard let name = group.properties["name"] as? String ??
+                group.properties["path"] as? String else {
+                continue
+            }
             let directoryUrl = resolveFileURL(object: group, groups: groupItems)
             groupRefs.append(
                 GroupReference(
