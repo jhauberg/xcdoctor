@@ -132,7 +132,7 @@ public struct XcodeProject {
     private var groupRefs: [GroupReference] = []
 
     private let propertyList: [String: Any]
-    private var buildConfigs: [String: Any] = [:]
+    private var buildConfigs: [(String, [String: Any])] = []
 
     var files: [FileReference] {
         fileRefs
@@ -142,37 +142,28 @@ public struct XcodeProject {
         groupRefs
     }
 
-    private func resolveProjectURL(ref: Dictionary<String, Any>.Element,
-                                   groups: [String: Any]) -> URL? {
-        guard let obj = ref.value as? [String: Any] else {
-            return nil
-        }
-        guard var path = obj["name"] as? String ?? obj["path"] as? String else {
+    private func resolveProjectURL(object: (String, [String: Any]),
+                                   groups: [(String, [String: Any])]) -> URL? {
+        guard var path = object.1["name"] as? String ?? object.1["path"] as? String else {
             return nil
         }
 
-        var parentReferences = parents(of: ref.key, in: groups)
-        while !parentReferences.isEmpty {
-            assert(parentReferences.count == 1)
-            let p = parentReferences.first!
-            let groupObj = p.value as! [String: Any]
-            if let parentPath = groupObj["name"] as? String ?? groupObj["path"] as? String,
+        var ref = object
+        while let parent = parent(of: ref, in: groups) {
+            if let parentPath = parent.1["name"] as? String ?? parent.1["path"] as? String,
                 !parentPath.isEmpty {
                 path = "\(parentPath)/\(path)"
             }
-            parentReferences = parents(of: p.key, in: groups)
+            ref = parent
         }
 
         return URL(string: path)
     }
 
-    private func resolveFileURL(ref: Dictionary<String, Any>.Element,
-                                groups: [String: Any]) -> URL? {
-        guard let obj = ref.value as? [String: Any] else {
-            return nil
-        }
-        guard let sourceTree = obj["sourceTree"] as? String,
-            var path = obj["path"] as? String else {
+    private func resolveFileURL(object: (String, [String: Any]),
+                                groups: [(String, [String: Any])]) -> URL? {
+        guard let sourceTree = object.1["sourceTree"] as? String,
+            var path = object.1["path"] as? String else {
             return nil
         }
         switch sourceTree {
@@ -195,14 +186,11 @@ public struct XcodeProject {
             // leave path unchanged
             break
         case "<group>":
-            var parentReferences = parents(of: ref.key, in: groups)
-            while !parentReferences.isEmpty {
-                assert(parentReferences.count == 1)
-                let p = parentReferences.first!
-                let groupObj = p.value as! [String: Any]
-                if let parentPath = groupObj["path"] as? String, !parentPath.isEmpty {
+            var ref = object
+            while let parent = parent(of: ref, in: groups) {
+                if let parentPath = parent.1["path"] as? String, !parentPath.isEmpty {
                     path = "\(parentPath)/\(path)"
-                    let groupSourceTree = groupObj["sourceTree"] as! String
+                    let groupSourceTree = parent.1["sourceTree"] as! String
                     if groupSourceTree == "SOURCE_ROOT" {
                         // don't resolve further back, even if
                         // this group is a child of another group
@@ -211,7 +199,7 @@ public struct XcodeProject {
                 } else {
                     // non-folder group or root of hierarchy
                 }
-                parentReferences = parents(of: p.key, in: groups)
+                ref = parent
             }
         default:
             fatalError()
@@ -225,72 +213,59 @@ public struct XcodeProject {
     private mutating func resolve() {
         fileRefs.removeAll()
         groupRefs.removeAll()
+        buildConfigs.removeAll()
 
-        guard let objects = propertyList["objects"] as? [String: Any] else {
-            return
-        }
+        let items = objects()
 
-        let fileReferences = objects.filter { (elem) -> Bool in
-            if let obj = elem.value as? [String: Any] {
-                if let isa = obj["isa"] as? String,
-                    isa == "PBXFileReference" {
-                    return true
-                }
+        let fileItems = items.filter { _, props -> Bool in
+            if let isa = props["isa"] as? String,
+                isa == "PBXFileReference" {
+                return true
             }
             return false
         }
-        let groupReferences = objects.filter { (elem) -> Bool in
-            if let obj = elem.value as? [String: Any] {
-                if let isa = obj["isa"] as? String,
-                    isa == "PBXGroup" || isa == "PBXVariantGroup" {
-                    return true
-                }
+        let groupItems = items.filter { _, props -> Bool in
+            if let isa = props["isa"] as? String,
+                isa == "PBXGroup" || isa == "PBXVariantGroup" {
+                return true
             }
             return false
         }
-        let buildReferences = objects.filter { (elem) -> Bool in
-            if let obj = elem.value as? [String: Any] {
-                if let isa = obj["isa"] as? String,
-                    isa == "PBXBuildFile" {
-                    return true
-                }
+        let buildFileReferences = items.filter { _, props -> Bool in
+            if let isa = props["isa"] as? String,
+                isa == "PBXBuildFile" {
+                return true
             }
             return false
-        }.map { (elem) -> String in
-            let obj = elem.value as! [String: Any]
-            return obj["fileRef"] as! String
+        }.map { _, props -> String in
+            props["fileRef"] as! String
         }
-        buildConfigs = objects.filter { (elem) -> Bool in
-            if let obj = elem.value as? [String: Any] {
-                if let isa = obj["isa"] as? String,
-                    isa == "XCBuildConfiguration" {
-                    return true
-                }
+        buildConfigs = items.filter { _, props -> Bool in
+            if let isa = props["isa"] as? String,
+                isa == "XCBuildConfiguration" {
+                return true
             }
             return false
         }
-        for file in fileReferences {
-            guard let fileUrl = resolveFileURL(ref: file, groups: groupReferences) else {
+        for file in fileItems {
+            guard let fileUrl = resolveFileURL(object: file, groups: groupItems) else {
                 continue
             }
-            let obj = file.value as! [String: Any]
-            let potentialFileType = obj["lastKnownFileType"] as? String
-            let explicitfileType = obj["explicitFileType"] as? String
+            let potentialFileType = file.1["lastKnownFileType"] as? String
+            let explicitfileType = file.1["explicitFileType"] as? String
             var isReferencedAsBuildFile: Bool = false
-            if buildReferences.contains(file.key) {
+            if buildFileReferences.contains(file.0) {
                 // file is directly referenced as a build file
                 isReferencedAsBuildFile = true
             } else {
                 // file might be contained in a parent group that is referenced as a build file
-                var parentReferences = parents(of: file.key, in: groupReferences)
-                while !parentReferences.isEmpty {
-                    assert(parentReferences.count == 1)
-                    let p = parentReferences.first!
-                    if buildReferences.contains(p.key) {
+                var ref = file
+                while let parent = parent(of: ref, in: groupItems) {
+                    if buildFileReferences.contains(parent.0) {
                         isReferencedAsBuildFile = true
                         break
                     }
-                    parentReferences = parents(of: p.key, in: groupReferences)
+                    ref = parent
                 }
             }
             fileRefs.append(
@@ -301,16 +276,15 @@ public struct XcodeProject {
                 )
             )
         }
-        for group in groupReferences {
-            let obj = group.value as! [String: Any]
-            guard let children = obj["children"] as? [String] else {
+        for group in groupItems {
+            guard let children = group.1["children"] as? [String] else {
                 continue
             }
-            guard let projectUrl = resolveProjectURL(ref: group, groups: groupReferences) else {
+            guard let projectUrl = resolveProjectURL(object: group, groups: groupItems) else {
                 continue
             }
-            let name = obj["name"] as? String ?? obj["path"] as? String ?? "<unknown>"
-            let directoryUrl = resolveFileURL(ref: group, groups: groupReferences)
+            let name = group.1["name"] as? String ?? group.1["path"] as? String ?? "<unknown>"
+            let directoryUrl = resolveFileURL(object: group, groups: groupItems)
             groupRefs.append(
                 GroupReference(
                     url: directoryUrl,
@@ -322,24 +296,34 @@ public struct XcodeProject {
         }
     }
 
-    private func parents(of reference: String, in groups: [String: Any])
-        -> [String: Any] {
-        groups.filter { group -> Bool in
-            let groupObj = group.value as! [String: Any]
-            let children = groupObj["children"] as! [String]
-            return children.contains(reference)
+    private func objects() -> [(String, [String: Any])] {
+        if let objects = propertyList["objects"] as? [String: Any] {
+            return objects.map { (key: String, value: Any) -> (String, [String: Any]) in
+                (key, value as? [String: Any] ?? [:])
+            }
         }
+        return []
+    }
+
+    private func parent(of object: (String, [String: Any]), in groups: [(String, [String: Any])])
+        -> (String, [String: Any])? {
+        groups.filter { _, props -> Bool in
+            if let children = props["children"] as? [String] {
+                return children
+                    .contains(object
+                        .0) // TODO: better map to struct, stuff like this becomes unruly
+            }
+            return false
+        }.first
     }
 
     func referencesAssetAsAppIcon(named asset: String) -> Bool {
-        for elem in buildConfigs {
-            if let config = elem.value as? [String: Any] {
-                if let settings = config["buildSettings"] as? [String: Any] {
-                    if let appIconSetting =
-                        settings["ASSETCATALOG_COMPILER_APPICON_NAME"] as? String {
-                        if appIconSetting == asset {
-                            return true
-                        }
+        for (_, config) in buildConfigs {
+            if let settings = config["buildSettings"] as? [String: Any] {
+                if let appIconSetting =
+                    settings["ASSETCATALOG_COMPILER_APPICON_NAME"] as? String {
+                    if appIconSetting == asset {
+                        return true
                     }
                 }
             }
@@ -348,16 +332,14 @@ public struct XcodeProject {
     }
 
     func referencesPropertyListAsInfoPlist(named file: FileReference) -> Bool {
-        for elem in buildConfigs {
-            if let config = elem.value as? [String: Any] {
-                if let settings = config["buildSettings"] as? [String: Any] {
-                    if let infoPlistSetting = settings["INFOPLIST_FILE"] as? String {
-                        let setting = infoPlistSetting.replacingOccurrences(
-                            of: "$(SRCROOT)", with: rootUrl.standardized.path
-                        )
-                        if file.url.standardized.path.hasSuffix(setting) {
-                            return true
-                        }
+        for (_, config) in buildConfigs {
+            if let settings = config["buildSettings"] as? [String: Any] {
+                if let infoPlistSetting = settings["INFOPLIST_FILE"] as? String {
+                    let setting = infoPlistSetting.replacingOccurrences(
+                        of: "$(SRCROOT)", with: rootUrl.standardized.path
+                    )
+                    if file.url.standardized.path.hasSuffix(setting) {
+                        return true
                     }
                 }
             }
