@@ -29,6 +29,7 @@ let sourceTypes: [(String, [String])] = [
     ("text.script.sh", ["sh"]),
 ]
 
+// represents any object in a pbxproj file; it's essentially just a key (id) and a dict
 private struct PBXObject {
     let id: String
     let properties: [String: Any]
@@ -147,6 +148,81 @@ public struct XcodeProject {
         groupRefs
     }
 
+    private mutating func resolve() {
+        fileRefs.removeAll()
+        groupRefs.removeAll()
+        buildConfigObjects.removeAll()
+
+        let items = objects()
+
+        func objects(identifyingAs isa: [String]) -> [PBXObject] {
+            items.filter { object -> Bool in
+                if let identity = object.properties["isa"] as? String {
+                    return isa.contains(identity)
+                }
+                return false
+            }
+        }
+
+        buildConfigObjects = objects(identifyingAs: ["XCBuildConfiguration"])
+
+        let fileItems = objects(identifyingAs: ["PBXFileReference"])
+        let groupItems = objects(identifyingAs: ["PBXGroup", "PBXVariantGroup"])
+        let buildFileReferences = objects(identifyingAs: ["PBXBuildFile"])
+            .map { object -> String in
+                object.properties["fileRef"] as! String
+            }
+
+        for file in fileItems {
+            guard let fileUrl = resolveFileURL(object: file, groups: groupItems) else {
+                continue
+            }
+            let potentialFileType = file.properties["lastKnownFileType"] as? String
+            let explicitfileType = file.properties["explicitFileType"] as? String
+            var isReferencedAsBuildFile: Bool = false
+            if buildFileReferences.contains(file.id) {
+                // file is directly referenced as a build file
+                isReferencedAsBuildFile = true
+            } else {
+                // file might be contained in a parent group that is referenced as a build file
+                var ref = file
+                while let parent = parent(of: ref, in: groupItems) {
+                    if buildFileReferences.contains(parent.id) {
+                        isReferencedAsBuildFile = true
+                        break
+                    }
+                    ref = parent
+                }
+            }
+            fileRefs.append(
+                FileReference(
+                    url: fileUrl,
+                    kind: explicitfileType ?? potentialFileType ?? "unknown",
+                    hasTargetMembership: isReferencedAsBuildFile
+                )
+            )
+        }
+
+        for group in groupItems {
+            guard let children = group.properties["children"] as? [String],
+                let projectUrl = resolveProjectURL(object: group, groups: groupItems) else {
+                continue
+            }
+            let name = group.properties["name"] as? String ??
+                group.properties["path"] as? String ??
+                "<unknown>"
+            let directoryUrl = resolveFileURL(object: group, groups: groupItems)
+            groupRefs.append(
+                GroupReference(
+                    url: directoryUrl,
+                    projectUrl: projectUrl,
+                    name: name,
+                    hasChildren: !children.isEmpty
+                )
+            )
+        }
+    }
+
     private func resolveProjectURL(object: PBXObject, groups: [PBXObject]) -> URL? {
         guard var path = object.properties["name"] as? String ?? object
             .properties["path"] as? String else {
@@ -213,83 +289,6 @@ public struct XcodeProject {
             return URL(fileURLWithPath: path)
         }
         return rootUrl.appendingPathComponent(path)
-    }
-
-    private mutating func resolve() {
-        fileRefs.removeAll()
-        groupRefs.removeAll()
-        buildConfigObjects.removeAll()
-
-        let items = objects()
-
-        func objects(identifyingAs isa: [String]) -> [PBXObject] {
-            items.filter { object -> Bool in
-                if let identity = object.properties["isa"] as? String {
-                    return isa.contains(identity)
-                }
-                return false
-            }
-        }
-
-        buildConfigObjects = objects(identifyingAs: ["XCBuildConfiguration"])
-
-        let fileItems = objects(identifyingAs: ["PBXFileReference"])
-        let groupItems = objects(identifyingAs: ["PBXGroup", "PBXVariantGroup"])
-        let buildFileReferences = objects(identifyingAs: ["PBXBuildFile"])
-            .map { object -> String in
-                object.properties["fileRef"] as! String
-            }
-
-        for file in fileItems {
-            guard let fileUrl = resolveFileURL(object: file, groups: groupItems) else {
-                continue
-            }
-            let potentialFileType = file.properties["lastKnownFileType"] as? String
-            let explicitfileType = file.properties["explicitFileType"] as? String
-            var isReferencedAsBuildFile: Bool = false
-            if buildFileReferences.contains(file.id) {
-                // file is directly referenced as a build file
-                isReferencedAsBuildFile = true
-            } else {
-                // file might be contained in a parent group that is referenced as a build file
-                var ref = file
-                while let parent = parent(of: ref, in: groupItems) {
-                    if buildFileReferences.contains(parent.id) {
-                        isReferencedAsBuildFile = true
-                        break
-                    }
-                    ref = parent
-                }
-            }
-            fileRefs.append(
-                FileReference(
-                    url: fileUrl,
-                    kind: explicitfileType ?? potentialFileType ?? "unknown",
-                    hasTargetMembership: isReferencedAsBuildFile
-                )
-            )
-        }
-
-        for group in groupItems {
-            guard let children = group.properties["children"] as? [String] else {
-                continue
-            }
-            guard let projectUrl = resolveProjectURL(object: group, groups: groupItems) else {
-                continue
-            }
-            let name = group.properties["name"] as? String ??
-                group.properties["path"] as? String ??
-                "<unknown>"
-            let directoryUrl = resolveFileURL(object: group, groups: groupItems)
-            groupRefs.append(
-                GroupReference(
-                    url: directoryUrl,
-                    projectUrl: projectUrl,
-                    name: name,
-                    hasChildren: !children.isEmpty
-                )
-            )
-        }
     }
 
     private func objects() -> [PBXObject] {
