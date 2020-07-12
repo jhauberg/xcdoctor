@@ -137,7 +137,7 @@ public struct XcodeProject {
     private var groupRefs: [GroupReference] = []
 
     private let propertyList: [String: Any]
-    private var buildConfigs: [PBXObject] = []
+    private var buildConfigObjects: [PBXObject] = []
 
     var files: [FileReference] {
         fileRefs
@@ -218,40 +218,28 @@ public struct XcodeProject {
     private mutating func resolve() {
         fileRefs.removeAll()
         groupRefs.removeAll()
-        buildConfigs.removeAll()
+        buildConfigObjects.removeAll()
 
         let items = objects()
 
-        let fileItems = items.filter { object -> Bool in
-            if let isa = object.properties["isa"] as? String,
-                isa == "PBXFileReference" {
-                return true
+        func objects(identifyingAs isa: [String]) -> [PBXObject] {
+            items.filter { object -> Bool in
+                if let identity = object.properties["isa"] as? String {
+                    return isa.contains(identity)
+                }
+                return false
             }
-            return false
         }
-        let groupItems = items.filter { object -> Bool in
-            if let isa = object.properties["isa"] as? String,
-                isa == "PBXGroup" || isa == "PBXVariantGroup" {
-                return true
+
+        buildConfigObjects = objects(identifyingAs: ["XCBuildConfiguration"])
+
+        let fileItems = objects(identifyingAs: ["PBXFileReference"])
+        let groupItems = objects(identifyingAs: ["PBXGroup", "PBXVariantGroup"])
+        let buildFileReferences = objects(identifyingAs: ["PBXBuildFile"])
+            .map { object -> String in
+                object.properties["fileRef"] as! String
             }
-            return false
-        }
-        let buildFileReferences = items.filter { object -> Bool in
-            if let isa = object.properties["isa"] as? String,
-                isa == "PBXBuildFile" {
-                return true
-            }
-            return false
-        }.map { object -> String in
-            object.properties["fileRef"] as! String
-        }
-        buildConfigs = items.filter { object -> Bool in
-            if let isa = object.properties["isa"] as? String,
-                isa == "XCBuildConfiguration" {
-                return true
-            }
-            return false
-        }
+
         for file in fileItems {
             guard let fileUrl = resolveFileURL(object: file, groups: groupItems) else {
                 continue
@@ -281,6 +269,7 @@ public struct XcodeProject {
                 )
             )
         }
+
         for group in groupItems {
             guard let children = group.properties["children"] as? [String] else {
                 continue
@@ -322,7 +311,7 @@ public struct XcodeProject {
     }
 
     func referencesAssetAsAppIcon(named asset: String) -> Bool {
-        for object in buildConfigs {
+        for object in buildConfigObjects {
             if let settings = object.properties["buildSettings"] as? [String: Any] {
                 if let appIconSetting =
                     settings["ASSETCATALOG_COMPILER_APPICON_NAME"] as? String {
@@ -336,7 +325,7 @@ public struct XcodeProject {
     }
 
     func referencesPropertyListAsInfoPlist(named file: FileReference) -> Bool {
-        for object in buildConfigs {
+        for object in buildConfigObjects {
             if let settings = object.properties["buildSettings"] as? [String: Any] {
                 if let infoPlistSetting = settings["INFOPLIST_FILE"] as? String {
                     let setting = infoPlistSetting.replacingOccurrences(
