@@ -366,6 +366,10 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
                         // the end, which should work out no matter the destination, while
                         // still being decently specific; e.g.
                         //      `/monster.png"`
+                        // TODO: a resource might be referenced in another resource; this search
+                        //       does not take that into account; it would also need to distinguish
+                        //       between text and binary; e.g. a png file should not be searched,
+                        //       but an xml file should
                         searchStrings = ["\"\(resourceName)\"", "/\(resourceName)\""]
                     }
                     for searchString in searchStrings {
