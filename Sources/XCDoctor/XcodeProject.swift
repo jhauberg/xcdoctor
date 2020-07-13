@@ -70,6 +70,11 @@ struct FileReference {
     }
 }
 
+struct ProductReference {
+    let name: String
+    let buildsSourceFiles: Bool
+}
+
 public enum XcodeProjectError: Error, Equatable {
     case incompatible(reason: String)
     case notFound(amongFilesInDirectory: Bool) // param indicates whether directory was searched
@@ -134,8 +139,10 @@ public struct XcodeProject {
 
     let rootUrl: URL
 
+    // TODO: rename simply as File, Group, Product?
     private var fileRefs: [FileReference] = []
     private var groupRefs: [GroupReference] = []
+    private var productRefs: [ProductReference] = []
 
     private let propertyList: [String: Any]
     private var buildConfigObjects: [PBXObject] = []
@@ -148,9 +155,15 @@ public struct XcodeProject {
         groupRefs
     }
 
+    var products: [ProductReference] {
+        productRefs
+    }
+
     private mutating func resolve() {
+        // TODO: refactor this bit; essentially all done during initialization: lazy vars?
         fileRefs.removeAll()
         groupRefs.removeAll()
+        productRefs.removeAll()
         buildConfigObjects.removeAll()
 
         let items = objects()
@@ -168,6 +181,7 @@ public struct XcodeProject {
 
         let fileItems = objects(identifyingAs: ["PBXFileReference"])
         let groupItems = objects(identifyingAs: ["PBXGroup", "PBXVariantGroup"])
+        let nativeTargetItems = objects(identifyingAs: ["PBXNativeTarget"])
         let buildFileReferences = objects(identifyingAs: ["PBXBuildFile"])
             .map { object -> String in
                 object.properties["fileRef"] as! String
@@ -220,6 +234,39 @@ public struct XcodeProject {
                     projectUrl: projectUrl,
                     name: name,
                     hasChildren: !children.isEmpty
+                )
+            )
+        }
+
+        for target in nativeTargetItems {
+            guard let name = target.properties["name"] as? String else {
+                continue
+            }
+            var compilesAnySource =
+                false // false until we determine any compilation phase of at least one source file
+            if let phases = target.properties["buildPhases"] as? [String] {
+                let compilationPhases = items.filter { object -> Bool in
+                    phases.contains(object.id)
+                }.filter { phase -> Bool in
+                    if let isa = phase.properties["isa"] as? String {
+                        return isa == "PBXSourcesBuildPhase"
+                    }
+                    return false
+                }
+                if !compilationPhases.isEmpty {
+                    for phase in compilationPhases {
+                        if let sources = phase.properties["files"] as? [String], !sources.isEmpty {
+                            // target compiles at least one source file
+                            compilesAnySource = true
+                            break
+                        }
+                    }
+                }
+            }
+            productRefs.append(
+                ProductReference(
+                    name: name,
+                    buildsSourceFiles: compilesAnySource
                 )
             )
         }

@@ -42,6 +42,10 @@ public enum Defect {
      A condition that applies if any group contains zero children (files or groups).
      */
     case emptyGroups
+    /**
+     A condition that applies if any native target is not built from at least one source-file.
+     */
+    case emptyTargets
 }
 
 /**
@@ -99,6 +103,14 @@ func emptyGroups(in project: XcodeProject) -> [GroupReference] {
 func emptyGroupPaths(in project: XcodeProject) -> [String] {
     emptyGroups(in: project).map { ref -> String in
         "\(ref.projectUrl.absoluteString)"
+    }
+}
+
+func emptyTargetNames(in project: XcodeProject) -> [String] {
+    project.products.filter { ref -> Bool in
+        !ref.buildsSourceFiles
+    }.map { product -> String in
+        product.name
     }
 }
 
@@ -293,7 +305,8 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
             return Diagnosis(
                 conclusion: "files not included in any target",
                 help: """
-                These files might not be used; consider whether they should be removed.
+                These files are never being compiled and might not be used;
+                consider whether they should be removed.
                 """,
                 cases: filePaths
             )
@@ -394,9 +407,22 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
             return Diagnosis(
                 conclusion: "empty groups",
                 help: """
-                These groups might be redundant; consider whether they should be removed.
+                These groups contain zero children and might be redundant;
+                consider whether they should be removed.
                 """,
                 cases: groupPaths
+            )
+        }
+    case .emptyTargets:
+        let targetNames = emptyTargetNames(in: project)
+        if !targetNames.isEmpty {
+            return Diagnosis(
+                conclusion: "empty targets",
+                help: """
+                These targets do not compile any sources and might be redundant;
+                consider whether they should be removed.
+                """,
+                cases: targetNames
             )
         }
     }

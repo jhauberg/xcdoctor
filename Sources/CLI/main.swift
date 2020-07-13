@@ -93,6 +93,7 @@ struct Doctor: ParsableCommand {
             .unusedResources,
             .emptyGroups,
             .danglingFiles,
+            .emptyTargets,
             .corruptPropertyLists,
             .nonExistentFiles,
             .nonExistentPaths,
