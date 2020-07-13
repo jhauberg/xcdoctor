@@ -187,13 +187,21 @@ public struct XcodeProject {
                 object.properties["fileRef"] as! String
             }
 
+        let excludedFileTypes = ["wrapper.xcdatamodel"]
+
         for file in fileItems {
-            guard let fileUrl = resolveFileURL(object: file, groups: groupItems) else {
-                continue
-            }
             let potentialFileType = file.properties["lastKnownFileType"] as? String
             let explicitfileType = file.properties["explicitFileType"] as? String
             let fileType = explicitfileType ?? potentialFileType
+
+            if let fileType = fileType, excludedFileTypes.contains(fileType) {
+                continue
+            }
+
+            guard let fileUrl = resolveFileURL(object: file, groups: groupItems) else {
+                continue
+            }
+
             var isReferencedAsBuildFile: Bool = false
             if buildFileReferences.contains(file.id) {
                 // file is directly referenced as a build file
