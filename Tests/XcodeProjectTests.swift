@@ -134,4 +134,21 @@ class XcodeProjectTests: XCTestCase {
         XCTAssert(cases.contains("xcdoctor/a"))
         XCTAssert(cases.contains("xcdoctor/b/c/d"))
     }
+
+    func testEmptyTargets() {
+        let condition: Defect = .emptyTargets
+        let result = XcodeProject.open(from: projectUrl(for: condition))
+        guard let project = try? result.get() else {
+            XCTFail(); return
+        }
+        let diagnosis = examine(project: project, for: condition)
+        guard let cases = diagnosis?.cases else {
+            XCTFail(); return
+        }
+        guard cases.count == 2 else {
+            XCTFail(); return
+        }
+        XCTAssert(cases.contains("xcdoctor"))
+        XCTAssert(cases.contains("empty"))
+    }
 }
