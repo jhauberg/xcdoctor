@@ -21,7 +21,7 @@ class XcodeProjectTests: XCTestCase {
     }
 
     func testProjectNotFoundInNonExistentPath() {
-        let result = XcodeProject.open(from: URL(fileURLWithPath: "~/Some/Project.xcodeproj"))
+        let result = XcodeProject.openAndEvaluate(from: URL(fileURLWithPath: "~/Some/Project.xcodeproj"))
         XCTAssertThrowsError(try result.get()) { error in
             XCTAssertEqual(
                 error as! XcodeProjectError,
@@ -31,7 +31,7 @@ class XcodeProjectTests: XCTestCase {
     }
 
     func testProjectNotFoundInNonExistentDirectory() {
-        let result = XcodeProject.open(from: URL(fileURLWithPath: "~/Some/Place/"))
+        let result = XcodeProject.openAndEvaluate(from: URL(fileURLWithPath: "~/Some/Place/"))
         XCTAssertThrowsError(try result.get()) { error in
             XCTAssertEqual(
                 error as! XcodeProjectError,
@@ -42,7 +42,7 @@ class XcodeProjectTests: XCTestCase {
 
     func testProjectNotFoundInDirectory() {
         // assumes this directory is kept rid of .xcodeprojs
-        let result = XcodeProject.open(from: URL(fileURLWithPath: "Tests/Subjects/"))
+        let result = XcodeProject.openAndEvaluate(from: URL(fileURLWithPath: "Tests/Subjects/"))
         XCTAssertThrowsError(try result.get()) { error in
             XCTAssertEqual(
                 error as! XcodeProjectError,
@@ -52,13 +52,13 @@ class XcodeProjectTests: XCTestCase {
     }
 
     func testProjectFound() {
-        let result = XcodeProject.open(from: projectUrl(for: .nonExistentFiles))
+        let result = XcodeProject.openAndEvaluate(from: projectUrl(for: .nonExistentFiles))
         XCTAssertNoThrow(try result.get())
     }
 
     func testFileReferenceResolution() {
         let condition: Defect = .nonExistentFiles
-        let result = XcodeProject.open(from: projectUrl(for: condition))
+        let result = XcodeProject.openAndEvaluate(from: projectUrl(for: condition))
         guard let project = try? result.get() else {
             XCTFail(); return
         }
@@ -73,7 +73,7 @@ class XcodeProjectTests: XCTestCase {
     }
 
     func testMissingFile() {
-        let result = XcodeProject.open(from: projectUrl(for: .nonExistentFiles))
+        let result = XcodeProject.openAndEvaluate(from: projectUrl(for: .nonExistentFiles))
         guard let project = try? result.get() else {
             XCTFail(); return
         }
@@ -84,7 +84,7 @@ class XcodeProjectTests: XCTestCase {
     }
 
     func testMissingFolder() {
-        let result = XcodeProject.open(from: projectUrl(for: .nonExistentPaths))
+        let result = XcodeProject.openAndEvaluate(from: projectUrl(for: .nonExistentPaths))
         guard let project = try? result.get() else {
             XCTFail(); return
         }
@@ -96,7 +96,7 @@ class XcodeProjectTests: XCTestCase {
 
     func testCorruptPlist() {
         let condition: Defect = .corruptPropertyLists
-        let result = XcodeProject.open(from: projectUrl(for: condition))
+        let result = XcodeProject.openAndEvaluate(from: projectUrl(for: condition))
         guard let project = try? result.get() else {
             XCTFail(); return
         }
@@ -108,7 +108,7 @@ class XcodeProjectTests: XCTestCase {
 
     func testDanglingFile() {
         let condition: Defect = .danglingFiles
-        let result = XcodeProject.open(from: projectUrl(for: condition))
+        let result = XcodeProject.openAndEvaluate(from: projectUrl(for: condition))
         guard let project = try? result.get() else {
             XCTFail(); return
         }
@@ -120,7 +120,7 @@ class XcodeProjectTests: XCTestCase {
 
     func testEmptyGroups() {
         let condition: Defect = .emptyGroups
-        let result = XcodeProject.open(from: projectUrl(for: condition))
+        let result = XcodeProject.openAndEvaluate(from: projectUrl(for: condition))
         guard let project = try? result.get() else {
             XCTFail(); return
         }
@@ -137,7 +137,7 @@ class XcodeProjectTests: XCTestCase {
 
     func testEmptyTargets() {
         let condition: Defect = .emptyTargets
-        let result = XcodeProject.open(from: projectUrl(for: condition))
+        let result = XcodeProject.openAndEvaluate(from: projectUrl(for: condition))
         guard let project = try? result.get() else {
             XCTFail(); return
         }
