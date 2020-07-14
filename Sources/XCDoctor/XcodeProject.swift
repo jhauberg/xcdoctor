@@ -84,6 +84,9 @@ private struct XcodeProjectLocation {
     let root: URL // directory containing .xcodeproj
     let xcodeproj: URL // path to .xcodeproj
     let pbx: URL // path to .xcodeproj/project.pbxproj
+    var name: String { // MyProject.xcodeproj
+        xcodeproj.lastPathComponent
+    }
 }
 
 private func findProjectLocation(from url: URL) -> Result<XcodeProjectLocation, XcodeProjectError> {
@@ -114,7 +117,11 @@ private func findProjectLocation(from url: URL) -> Result<XcodeProjectLocation, 
     }
     let directoryUrl = xcodeprojUrl // for example, ~/Development/My/Project.xcodeproj
         .deletingLastPathComponent() //             ~/Development/My/
-    return .success(XcodeProjectLocation(root: directoryUrl, xcodeproj: xcodeprojUrl, pbx: pbxUrl))
+    return .success(XcodeProjectLocation(
+        root: directoryUrl,
+        xcodeproj: xcodeprojUrl,
+        pbx: pbxUrl
+    ))
 }
 
 private func parent(of object: PBXObject, in groups: [PBXObject]) -> PBXObject? {
@@ -198,8 +205,8 @@ private func resolveFileURL(
     return location.root.appendingPathComponent(path)
 }
 
-private func objectReferences(in propertyList: [String: Any]) -> [PBXObject] {
-    guard let objects = propertyList["objects"] as? [String: Any] else {
+private func objectReferences(in objectGraph: [String: Any]) -> [PBXObject] {
+    guard let objects = objectGraph["objects"] as? [String: Any] else {
         return []
     }
 
@@ -345,12 +352,17 @@ private func productReferences(among objects: [PBXObject]) -> [ProductReference]
 
 public struct XcodeProject {
     /**
-     Attempts to locate and read an Xcode project at a given URL.
+     Attempts to locate and evaluate an Xcode project at a given URL.
 
      If the URL leads to a directory, files in that directory will be enumerated in search
      of an .xcodeproj (subdirectories will not be searched).
      */
-    public static func open(from url: URL) -> Result<XcodeProject, XcodeProjectError> {
+    public static func openAndEvaluate(
+        from url: URL,
+        beforeOpeningProject: ((String) -> Void)? = nil,
+        beforeEvaluatingProject: ((String) -> Void)? = nil
+    )
+        -> Result<XcodeProject, XcodeProjectError> {
         let projectLocation: XcodeProjectLocation
         switch findProjectLocation(from: url) {
         case let .success(location):
@@ -358,6 +370,7 @@ public struct XcodeProject {
         case let .failure(error):
             return .failure(error)
         }
+        beforeOpeningProject?(projectLocation.name)
         do {
             var format = PropertyListSerialization.PropertyListFormat.openStep
             guard let plist = try PropertyListSerialization.propertyList(
@@ -367,6 +380,7 @@ public struct XcodeProject {
             ) as? [String: Any] else {
                 return .failure(.incompatible(reason: "unsupported Xcode project format"))
             }
+            beforeEvaluatingProject?(projectLocation.name)
             return .success(
                 XcodeProject(locatedAt: projectLocation, objectGraph: plist)
             )

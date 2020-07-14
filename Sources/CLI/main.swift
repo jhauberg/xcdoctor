@@ -65,7 +65,15 @@ struct Doctor: ParsableCommand {
         }
 
         let project: XcodeProject
-        switch XcodeProject.open(from: url) {
+        switch XcodeProject.openAndEvaluate(
+            from: url,
+            beforeOpeningProject: { name in
+                printdiag(text: "Opening \(name) ...")
+            },
+            beforeEvaluatingProject: { name in
+                printdiag(text: "Evaluating \(name) ...")
+            }
+        ) {
         case let .success(xcodeProject):
             project = xcodeProject
         case let .failure(error):
