@@ -12,7 +12,7 @@ import Foundation
 // note that files matching these indicators will be subject
 // to full-text search (unusedResources), so including assets
 // (e.g. images, or videos, in particular) would not be ideal
-let sourceTypes: [(String, [String])] = [
+private let sourceTypes: [(String, [String])] = [
     ("file.storyboard", ["storyboard"]),
     ("file.xib", ["xib", "nib"]),
     ("folder.assetcatalog", ["xcassets"]),

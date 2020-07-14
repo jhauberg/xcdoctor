@@ -66,14 +66,14 @@ public struct Diagnosis {
     public let cases: [String]?
 }
 
-func nonExistentFiles(in project: XcodeProject) -> [FileReference] {
+private func nonExistentFiles(in project: XcodeProject) -> [FileReference] {
     project.files.filter { ref -> Bool in
         // include this reference if file does not exist
         !FileManager.default.fileExists(atPath: ref.path)
     }
 }
 
-func nonExistentFilePaths(in project: XcodeProject) -> [String] {
+private func nonExistentFilePaths(in project: XcodeProject) -> [String] {
     nonExistentFiles(in: project).map { ref -> String in
         ref.path
     }
@@ -88,25 +88,25 @@ func nonExistentGroups(in project: XcodeProject) -> [GroupReference] {
     }
 }
 
-func nonExistentGroupPaths(in project: XcodeProject) -> [String] {
+private func nonExistentGroupPaths(in project: XcodeProject) -> [String] {
     nonExistentGroups(in: project).map { ref -> String in
         "\(ref.path!): \"\(ref.projectUrl.absoluteString)\""
     }
 }
 
-func emptyGroups(in project: XcodeProject) -> [GroupReference] {
+private func emptyGroups(in project: XcodeProject) -> [GroupReference] {
     project.groups.filter { ref -> Bool in
         !ref.hasChildren
     }
 }
 
-func emptyGroupPaths(in project: XcodeProject) -> [String] {
+private func emptyGroupPaths(in project: XcodeProject) -> [String] {
     emptyGroups(in: project).map { ref -> String in
         "\(ref.projectUrl.absoluteString)"
     }
 }
 
-func emptyTargetNames(in project: XcodeProject) -> [String] {
+private func emptyTargetNames(in project: XcodeProject) -> [String] {
     project.products.filter { ref -> Bool in
         !ref.buildsSourceFiles
     }.map { product -> String in
@@ -114,13 +114,13 @@ func emptyTargetNames(in project: XcodeProject) -> [String] {
     }
 }
 
-func propertyListReferences(in project: XcodeProject) -> [FileReference] {
+private func propertyListReferences(in project: XcodeProject) -> [FileReference] {
     project.files.filter { ref -> Bool in
         ref.kind == "text.plist.xml" || ref.url.pathExtension == "plist"
     }
 }
 
-func danglingFilePaths(in project: XcodeProject) -> [String] {
+private func danglingFilePaths(in project: XcodeProject) -> [String] {
     project.files.filter { ref -> Bool in
         !ref.isHeaderFile && ref.isSourceFile && !ref.hasTargetMembership
     }.filter { ref -> Bool in
@@ -134,7 +134,7 @@ func danglingFilePaths(in project: XcodeProject) -> [String] {
     }
 }
 
-func sourceFiles(in project: XcodeProject) -> [FileReference] {
+private func sourceFiles(in project: XcodeProject) -> [FileReference] {
     let exceptFiles = nonExistentFiles(in: project)
     return project.files.filter { ref -> Bool in
         ref.isSourceFile && !exceptFiles.contains(where: { otherRef -> Bool in
@@ -143,7 +143,7 @@ func sourceFiles(in project: XcodeProject) -> [FileReference] {
     }
 }
 
-struct Resource {
+private struct Resource {
     let name: String
     let fileName: String?
 
@@ -168,7 +168,7 @@ struct Resource {
     }
 }
 
-func resources(in project: XcodeProject) -> [Resource] {
+private func resources(in project: XcodeProject) -> [Resource] {
     let sources = sourceFiles(in: project)
     return project.files.filter { ref -> Bool in
         // TODO: specific exclusions? e.g. "archive.ar"/"a", ".whatever" etc
@@ -200,7 +200,7 @@ extension URL {
     }
 }
 
-func assetURLs(at url: URL) -> [URL] {
+private func assetURLs(at url: URL) -> [URL] {
     guard let dirEnumerator = FileManager.default.enumerator(
         at: url,
         includingPropertiesForKeys: [.isDirectoryKey]
@@ -215,7 +215,7 @@ func assetURLs(at url: URL) -> [URL] {
     }
 }
 
-func assets(in project: XcodeProject) -> [Resource] {
+private func assets(in project: XcodeProject) -> [Resource] {
     project.files.filter { ref -> Bool in
         ref.kind == "folder.assetcatalog" || ref.url.pathExtension == "xcassets"
     }.flatMap { ref -> [Resource] in
@@ -433,7 +433,7 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
     return nil
 }
 
-func strip(text: String, matchingExpressions expressions: [NSRegularExpression]) -> String {
+private func strip(text: String, matchingExpressions expressions: [NSRegularExpression]) -> String {
     var str = text
     for expr in expressions {
         var match = expr.firstMatch(in: str, range: NSRange(location: 0, length: str.utf16.count))
