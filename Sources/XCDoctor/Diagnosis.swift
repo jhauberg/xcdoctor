@@ -146,8 +146,10 @@ private func sourceFiles(in project: XcodeProject) -> [FileReference] {
 private struct Resource {
     let name: String
     let fileName: String?
-
-    var nameVariants: [String] {
+    let nameVariants: [String]
+    init(name: String, fileName: String? = nil) {
+        self.name = name
+        self.fileName = fileName
         if let fileName = fileName {
             let plainFileName = fileName
                 .replacingOccurrences(of: "@1x", with: "")
@@ -157,14 +159,15 @@ private struct Resource {
                 .replacingOccurrences(of: "@1x", with: "")
                 .replacingOccurrences(of: "@2x", with: "")
                 .replacingOccurrences(of: "@3x", with: "")
-            return Array(Set([
+            nameVariants = Array(Set([
                 name,
                 plainName,
                 fileName,
                 plainFileName,
             ]))
+        } else {
+            nameVariants = [name]
         }
-        return [name]
     }
 }
 
@@ -220,8 +223,7 @@ private func assets(in project: XcodeProject) -> [Resource] {
         ref.kind == "folder.assetcatalog" || ref.url.pathExtension == "xcassets"
     }.flatMap { ref -> [Resource] in
         assetURLs(at: ref.url).map { assetUrl -> Resource in
-            Resource(name: assetUrl.deletingPathExtension().lastPathComponent,
-                     fileName: nil)
+            Resource(name: assetUrl.deletingPathExtension().lastPathComponent)
         }
     }
 }
@@ -312,11 +314,6 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
             )
         }
     case .unusedResources:
-        // TODO: the resulting resources could potentially contain duplicates;
-        //       for example, if project contains two files:
-        //         "Icon10@2x.png" and "Icon10@3x.png"
-        //       this will result (as expected) in two different resources,
-        //       however, these could be squashed into one (with additional variants)
         var res = resources(in: project) + assets(in: project)
         for source in sourceFiles(in: project) {
             let fileContents: String
