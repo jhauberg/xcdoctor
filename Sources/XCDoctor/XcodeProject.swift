@@ -117,6 +117,232 @@ private func findProjectLocation(from url: URL) -> Result<XcodeProjectLocation, 
     return .success(XcodeProjectLocation(root: directoryUrl, xcodeproj: xcodeprojUrl, pbx: pbxUrl))
 }
 
+private func parent(of object: PBXObject, in groups: [PBXObject]) -> PBXObject? {
+    groups.filter { parent -> Bool in
+        if let children = parent.properties["children"] as? [String] {
+            return children.contains(object.id)
+        }
+        return false
+    }.first
+}
+
+private func resolveProjectURL(object: PBXObject, groups: [PBXObject]) -> URL? {
+    guard var path = object.properties["name"] as? String ?? object
+        .properties["path"] as? String else {
+        return nil
+    }
+
+    var ref = object
+    while let parent = parent(of: ref, in: groups) {
+        if let parentPath = parent.properties["name"] as? String ?? parent
+            .properties["path"] as? String,
+            !parentPath.isEmpty {
+            path = "\(parentPath)/\(path)"
+        }
+        ref = parent
+    }
+
+    return URL(string: path)
+}
+
+private func resolveFileURL(
+    object: PBXObject,
+    groups: [PBXObject],
+    fromProjectLocation location: XcodeProjectLocation
+) -> URL? {
+    guard let sourceTree = object.properties["sourceTree"] as? String,
+        var path = object.properties["path"] as? String else {
+        return nil
+    }
+    switch sourceTree {
+    case "":
+        // skip this file
+        return nil
+    case "SDKROOT":
+        // skip this file
+        return nil
+    case "DEVELOPER_DIR":
+        // skip this file
+        return nil
+    case "BUILT_PRODUCTS_DIR":
+        // skip this file
+        return nil
+    case "SOURCE_ROOT":
+        // leave path unchanged
+        break
+    case "<absolute>":
+        // leave path unchanged
+        break
+    case "<group>":
+        var ref = object
+        while let parent = parent(of: ref, in: groups) {
+            if let parentPath = parent.properties["path"] as? String, !parentPath.isEmpty {
+                path = "\(parentPath)/\(path)"
+                let groupSourceTree = parent.properties["sourceTree"] as! String
+                if groupSourceTree == "SOURCE_ROOT" {
+                    // don't resolve further back, even if
+                    // this group is a child of another group
+                    break
+                }
+            } else {
+                // non-folder group or root of hierarchy
+            }
+            ref = parent
+        }
+    default:
+        fatalError()
+    }
+    if NSString(string: path).isAbsolutePath {
+        return URL(fileURLWithPath: path)
+    }
+    return location.root.appendingPathComponent(path)
+}
+
+private func objectReferences(in propertyList: [String: Any]) -> [PBXObject] {
+    guard let objects = propertyList["objects"] as? [String: Any] else {
+        return []
+    }
+
+    return objects.map { (key: String, value: Any) -> PBXObject in
+        PBXObject(id: key, properties: value as? [String: Any] ?? [:])
+    }
+}
+
+private func objectsIdentifying(as identities: [String],
+                                among objects: [PBXObject]) -> [PBXObject] {
+    objects.filter { object -> Bool in
+        if let identity = object.properties["isa"] as? String {
+            return identities.contains(identity)
+        }
+        return false
+    }
+}
+
+private func fileReferences(
+    among objects: [PBXObject],
+    fromProjectLocation location: XcodeProjectLocation
+) -> [FileReference] {
+    var fileRefs: [FileReference] = []
+    let groupObjects = objectsIdentifying(as: ["PBXGroup", "PBXVariantGroup"], among: objects)
+    let buildFileReferences = objectsIdentifying(as: ["PBXBuildFile"], among: objects)
+        .map { object -> String in
+            object.properties["fileRef"] as! String
+        }
+
+    let excludedFileTypes = ["wrapper.xcdatamodel"]
+
+    for file in objectsIdentifying(as: ["PBXFileReference"], among: objects) {
+        let potentialFileType = file.properties["lastKnownFileType"] as? String
+        let explicitfileType = file.properties["explicitFileType"] as? String
+        let fileType = explicitfileType ?? potentialFileType
+
+        if let fileType = fileType, excludedFileTypes.contains(fileType) {
+            continue
+        }
+
+        guard let fileUrl = resolveFileURL(
+            object: file,
+            groups: groupObjects,
+            fromProjectLocation: location
+        ) else {
+            continue
+        }
+
+        var isReferencedAsBuildFile: Bool = false
+        if buildFileReferences.contains(file.id) {
+            // file is directly referenced as a build file
+            isReferencedAsBuildFile = true
+        } else {
+            // file might be contained in a parent group that is referenced as a build file
+            var ref = file
+            while let parent = parent(of: ref, in: groupObjects) {
+                if buildFileReferences.contains(parent.id) {
+                    isReferencedAsBuildFile = true
+                    break
+                }
+                ref = parent
+            }
+        }
+        fileRefs.append(
+            FileReference(
+                url: fileUrl,
+                kind: fileType,
+                hasTargetMembership: isReferencedAsBuildFile
+            )
+        )
+    }
+    return fileRefs
+}
+
+private func groupReferences(
+    among objects: [PBXObject],
+    fromProjectLocation location: XcodeProjectLocation
+) -> [GroupReference] {
+    var groupRefs: [GroupReference] = []
+    let groupObjects = objectsIdentifying(as: ["PBXGroup", "PBXVariantGroup"], among: objects)
+    for group in groupObjects {
+        guard let children = group.properties["children"] as? [String],
+            let projectUrl = resolveProjectURL(object: group, groups: groupObjects) else {
+            continue
+        }
+        guard let name = group.properties["name"] as? String ??
+            group.properties["path"] as? String else {
+            continue
+        }
+        let directoryUrl = resolveFileURL(
+            object: group,
+            groups: groupObjects,
+            fromProjectLocation: location
+        )
+        groupRefs.append(
+            GroupReference(
+                url: directoryUrl,
+                projectUrl: projectUrl,
+                name: name,
+                hasChildren: !children.isEmpty
+            )
+        )
+    }
+    return groupRefs
+}
+
+private func productReferences(among objects: [PBXObject]) -> [ProductReference] {
+    var productRefs: [ProductReference] = []
+    for target in objectsIdentifying(as: ["PBXNativeTarget"], among: objects) {
+        guard let name = target.properties["name"] as? String else {
+            continue
+        }
+        var compilesAnySource =
+            false // false until we determine any compilation phase of at least one source file
+        if let phases = target.properties["buildPhases"] as? [String] {
+            let compilationPhases = objects.filter { object -> Bool in
+                phases.contains(object.id)
+            }.filter { phase -> Bool in
+                if let isa = phase.properties["isa"] as? String {
+                    return isa == "PBXSourcesBuildPhase"
+                }
+                return false
+            }
+            if !compilationPhases.isEmpty {
+                for phase in compilationPhases {
+                    if let sources = phase.properties["files"] as? [String], !sources.isEmpty {
+                        // target compiles at least one source file
+                        compilesAnySource = true
+                        break
+                    }
+                }
+            }
+        }
+        productRefs.append(
+            ProductReference(
+                name: name,
+                buildsSourceFiles: compilesAnySource
+            )
+        )
+    }
+    return productRefs
+}
+
 public struct XcodeProject {
     /**
      Attempts to locate and read an Xcode project at a given URL.
@@ -142,7 +368,8 @@ public struct XcodeProject {
                 return .failure(.incompatible(reason: "unsupported Xcode project format"))
             }
             return .success(
-                XcodeProject(locatedAt: projectLocation, objectGraph: plist))
+                XcodeProject(locatedAt: projectLocation, objectGraph: plist)
+            )
         } catch {
             return .failure(.incompatible(reason: "unsupported Xcode project format"))
         }
@@ -150,241 +377,24 @@ public struct XcodeProject {
 
     private init(locatedAt location: XcodeProjectLocation, objectGraph: [String: Any]) {
         self.location = location
-        propertyList = objectGraph
-        resolve()
+
+        let objects = objectReferences(in: objectGraph)
+
+        buildConfigurations = objectsIdentifying(as: ["XCBuildConfiguration"], among: objects)
+        files = fileReferences(among: objects, fromProjectLocation: location)
+        groups = groupReferences(among: objects, fromProjectLocation: location)
+        products = productReferences(among: objects)
     }
 
     private let location: XcodeProjectLocation
+    private let buildConfigurations: [PBXObject]
 
-    // TODO: rename simply as File, Group, Product?
-    private var fileRefs: [FileReference] = []
-    private var groupRefs: [GroupReference] = []
-    private var productRefs: [ProductReference] = []
-
-    private let propertyList: [String: Any]
-    private var buildConfigObjects: [PBXObject] = []
-
-    var files: [FileReference] {
-        fileRefs
-    }
-
-    var groups: [GroupReference] {
-        groupRefs
-    }
-
-    var products: [ProductReference] {
-        productRefs
-    }
-
-    private mutating func resolve() {
-        // TODO: refactor this bit; essentially all done during initialization: lazy vars?
-        fileRefs.removeAll()
-        groupRefs.removeAll()
-        productRefs.removeAll()
-        buildConfigObjects.removeAll()
-
-        let items = objects()
-
-        func objects(identifyingAs isa: [String]) -> [PBXObject] {
-            items.filter { object -> Bool in
-                if let identity = object.properties["isa"] as? String {
-                    return isa.contains(identity)
-                }
-                return false
-            }
-        }
-
-        buildConfigObjects = objects(identifyingAs: ["XCBuildConfiguration"])
-
-        let fileItems = objects(identifyingAs: ["PBXFileReference"])
-        let groupItems = objects(identifyingAs: ["PBXGroup", "PBXVariantGroup"])
-        let nativeTargetItems = objects(identifyingAs: ["PBXNativeTarget"])
-        let buildFileReferences = objects(identifyingAs: ["PBXBuildFile"])
-            .map { object -> String in
-                object.properties["fileRef"] as! String
-            }
-
-        let excludedFileTypes = ["wrapper.xcdatamodel"]
-
-        for file in fileItems {
-            let potentialFileType = file.properties["lastKnownFileType"] as? String
-            let explicitfileType = file.properties["explicitFileType"] as? String
-            let fileType = explicitfileType ?? potentialFileType
-
-            if let fileType = fileType, excludedFileTypes.contains(fileType) {
-                continue
-            }
-
-            guard let fileUrl = resolveFileURL(object: file, groups: groupItems) else {
-                continue
-            }
-
-            var isReferencedAsBuildFile: Bool = false
-            if buildFileReferences.contains(file.id) {
-                // file is directly referenced as a build file
-                isReferencedAsBuildFile = true
-            } else {
-                // file might be contained in a parent group that is referenced as a build file
-                var ref = file
-                while let parent = parent(of: ref, in: groupItems) {
-                    if buildFileReferences.contains(parent.id) {
-                        isReferencedAsBuildFile = true
-                        break
-                    }
-                    ref = parent
-                }
-            }
-            fileRefs.append(
-                FileReference(
-                    url: fileUrl,
-                    kind: fileType,
-                    hasTargetMembership: isReferencedAsBuildFile
-                )
-            )
-        }
-
-        for group in groupItems {
-            guard let children = group.properties["children"] as? [String],
-                let projectUrl = resolveProjectURL(object: group, groups: groupItems) else {
-                continue
-            }
-            guard let name = group.properties["name"] as? String ??
-                group.properties["path"] as? String else {
-                continue
-            }
-            let directoryUrl = resolveFileURL(object: group, groups: groupItems)
-            groupRefs.append(
-                GroupReference(
-                    url: directoryUrl,
-                    projectUrl: projectUrl,
-                    name: name,
-                    hasChildren: !children.isEmpty
-                )
-            )
-        }
-
-        for target in nativeTargetItems {
-            guard let name = target.properties["name"] as? String else {
-                continue
-            }
-            var compilesAnySource =
-                false // false until we determine any compilation phase of at least one source file
-            if let phases = target.properties["buildPhases"] as? [String] {
-                let compilationPhases = items.filter { object -> Bool in
-                    phases.contains(object.id)
-                }.filter { phase -> Bool in
-                    if let isa = phase.properties["isa"] as? String {
-                        return isa == "PBXSourcesBuildPhase"
-                    }
-                    return false
-                }
-                if !compilationPhases.isEmpty {
-                    for phase in compilationPhases {
-                        if let sources = phase.properties["files"] as? [String], !sources.isEmpty {
-                            // target compiles at least one source file
-                            compilesAnySource = true
-                            break
-                        }
-                    }
-                }
-            }
-            productRefs.append(
-                ProductReference(
-                    name: name,
-                    buildsSourceFiles: compilesAnySource
-                )
-            )
-        }
-    }
-
-    private func resolveProjectURL(object: PBXObject, groups: [PBXObject]) -> URL? {
-        guard var path = object.properties["name"] as? String ?? object
-            .properties["path"] as? String else {
-            return nil
-        }
-
-        var ref = object
-        while let parent = parent(of: ref, in: groups) {
-            if let parentPath = parent.properties["name"] as? String ?? parent
-                .properties["path"] as? String,
-                !parentPath.isEmpty {
-                path = "\(parentPath)/\(path)"
-            }
-            ref = parent
-        }
-
-        return URL(string: path)
-    }
-
-    private func resolveFileURL(object: PBXObject, groups: [PBXObject]) -> URL? {
-        guard let sourceTree = object.properties["sourceTree"] as? String,
-            var path = object.properties["path"] as? String else {
-            return nil
-        }
-        switch sourceTree {
-        case "":
-            // skip this file
-            return nil
-        case "SDKROOT":
-            // skip this file
-            return nil
-        case "DEVELOPER_DIR":
-            // skip this file
-            return nil
-        case "BUILT_PRODUCTS_DIR":
-            // skip this file
-            return nil
-        case "SOURCE_ROOT":
-            // leave path unchanged
-            break
-        case "<absolute>":
-            // leave path unchanged
-            break
-        case "<group>":
-            var ref = object
-            while let parent = parent(of: ref, in: groups) {
-                if let parentPath = parent.properties["path"] as? String, !parentPath.isEmpty {
-                    path = "\(parentPath)/\(path)"
-                    let groupSourceTree = parent.properties["sourceTree"] as! String
-                    if groupSourceTree == "SOURCE_ROOT" {
-                        // don't resolve further back, even if
-                        // this group is a child of another group
-                        break
-                    }
-                } else {
-                    // non-folder group or root of hierarchy
-                }
-                ref = parent
-            }
-        default:
-            fatalError()
-        }
-        if NSString(string: path).isAbsolutePath {
-            return URL(fileURLWithPath: path)
-        }
-        return location.root.appendingPathComponent(path)
-    }
-
-    private func objects() -> [PBXObject] {
-        if let objects = propertyList["objects"] as? [String: Any] {
-            return objects.map { (key: String, value: Any) -> PBXObject in
-                PBXObject(id: key, properties: value as? [String: Any] ?? [:])
-            }
-        }
-        return []
-    }
-
-    private func parent(of object: PBXObject, in groups: [PBXObject]) -> PBXObject? {
-        groups.filter { parent -> Bool in
-            if let children = parent.properties["children"] as? [String] {
-                return children.contains(object.id)
-            }
-            return false
-        }.first
-    }
+    let files: [FileReference]
+    let groups: [GroupReference]
+    let products: [ProductReference]
 
     func referencesAssetAsAppIcon(named asset: String) -> Bool {
-        for object in buildConfigObjects {
+        for object in buildConfigurations {
             if let settings = object.properties["buildSettings"] as? [String: Any] {
                 if let appIconSetting =
                     settings["ASSETCATALOG_COMPILER_APPICON_NAME"] as? String {
@@ -398,7 +408,7 @@ public struct XcodeProject {
     }
 
     func referencesPropertyListAsInfoPlist(named file: FileReference) -> Bool {
-        for object in buildConfigObjects {
+        for object in buildConfigurations {
             if let settings = object.properties["buildSettings"] as? [String: Any] {
                 if let infoPlistSetting = settings["INFOPLIST_FILE"] as? String {
                     let setting = infoPlistSetting.replacingOccurrences(
