@@ -80,64 +80,81 @@ public enum XcodeProjectError: Error, Equatable {
     case notFound(amongFilesInDirectory: Bool) // param indicates whether directory was searched
 }
 
-public struct XcodeProject {
-    public static func open(from url: URL) -> Result<XcodeProject, XcodeProjectError> {
-        let projectUrl: URL
+private struct XcodeProjectLocation {
+    let root: URL // directory containing .xcodeproj
+    let xcodeproj: URL // path to .xcodeproj
+    let pbx: URL // path to .xcodeproj/project.pbxproj
+}
 
-        if !FileManager.default.fileExists(atPath: url.standardized.path) {
-            return .failure(.notFound(amongFilesInDirectory: url.hasDirectoryPath))
-        }
-
-        if !url.isDirectory {
-            return .failure(.incompatible(reason: "not an Xcode project"))
-        }
-
-        if url.pathExtension != "xcodeproj" {
-            let files = try! FileManager.default.contentsOfDirectory(
-                atPath: url.standardized.path
-            )
-            if let xcodeProjectFile = files.first(where: { file -> Bool in
-                file.hasSuffix("xcodeproj")
-            }) {
-                projectUrl = url.appendingPathComponent(xcodeProjectFile)
-            } else {
-                return .failure(.notFound(amongFilesInDirectory: true))
-            }
+private func findProjectLocation(from url: URL) -> Result<XcodeProjectLocation, XcodeProjectError> {
+    let xcodeprojUrl: URL
+    if !FileManager.default.fileExists(atPath: url.standardized.path) {
+        return .failure(.notFound(amongFilesInDirectory: url.hasDirectoryPath))
+    }
+    if !url.isDirectory {
+        return .failure(.incompatible(reason: "not an Xcode project"))
+    }
+    if url.pathExtension != "xcodeproj" {
+        let files = try! FileManager.default.contentsOfDirectory(
+            atPath: url.standardized.path
+        )
+        if let xcodeProjectFile = files.first(where: { file -> Bool in
+            file.hasSuffix("xcodeproj")
+        }) {
+            xcodeprojUrl = url.appendingPathComponent(xcodeProjectFile)
         } else {
-            projectUrl = url
+            return .failure(.notFound(amongFilesInDirectory: true))
         }
+    } else {
+        xcodeprojUrl = url
+    }
+    let pbxUrl = xcodeprojUrl.appendingPathComponent("project.pbxproj")
+    if !FileManager.default.fileExists(atPath: pbxUrl.standardized.path) {
+        return .failure(.incompatible(reason: "unsupported Xcode project format"))
+    }
+    let directoryUrl = xcodeprojUrl // for example, ~/Development/My/Project.xcodeproj
+        .deletingLastPathComponent() //             ~/Development/My/
+    return .success(XcodeProjectLocation(root: directoryUrl, xcodeproj: xcodeprojUrl, pbx: pbxUrl))
+}
 
-        let pbxUrl = projectUrl.appendingPathComponent("project.pbxproj")
+public struct XcodeProject {
+    /**
+     Attempts to locate and read an Xcode project at a given URL.
 
-        if !FileManager.default.fileExists(atPath: pbxUrl.standardized.path) {
-            return .failure(.incompatible(reason: "unsupported Xcode project format"))
+     If the URL leads to a directory, files in that directory will be enumerated in search
+     of an .xcodeproj (subdirectories will not be searched).
+     */
+    public static func open(from url: URL) -> Result<XcodeProject, XcodeProjectError> {
+        let projectLocation: XcodeProjectLocation
+        switch findProjectLocation(from: url) {
+        case let .success(location):
+            projectLocation = location
+        case let .failure(error):
+            return .failure(error)
         }
-
         do {
             var format = PropertyListSerialization.PropertyListFormat.openStep
             guard let plist = try PropertyListSerialization.propertyList(
-                from: try Data(contentsOf: pbxUrl),
+                from: try Data(contentsOf: projectLocation.pbx),
                 options: .mutableContainersAndLeaves,
                 format: &format
             ) as? [String: Any] else {
                 return .failure(.incompatible(reason: "unsupported Xcode project format"))
             }
-            let rootUrl = pbxUrl // for example, ~/Development/My/Project.xcodeproj/project.pbxproj
-                .deletingLastPathComponent() //  ~/Development/My/Project.xcodeproj/
-                .deletingLastPathComponent() //  ~/Development/My/
-            return .success(XcodeProject(locatedAtRootURL: rootUrl, objectGraph: plist))
+            return .success(
+                XcodeProject(locatedAt: projectLocation, objectGraph: plist))
         } catch {
             return .failure(.incompatible(reason: "unsupported Xcode project format"))
         }
     }
 
-    private init(locatedAtRootURL url: URL, objectGraph: [String: Any]) {
-        rootUrl = url
+    private init(locatedAt location: XcodeProjectLocation, objectGraph: [String: Any]) {
+        self.location = location
         propertyList = objectGraph
         resolve()
     }
 
-    let rootUrl: URL
+    private let location: XcodeProjectLocation
 
     // TODO: rename simply as File, Group, Product?
     private var fileRefs: [FileReference] = []
@@ -345,7 +362,7 @@ public struct XcodeProject {
         if NSString(string: path).isAbsolutePath {
             return URL(fileURLWithPath: path)
         }
-        return rootUrl.appendingPathComponent(path)
+        return location.root.appendingPathComponent(path)
     }
 
     private func objects() -> [PBXObject] {
@@ -385,7 +402,7 @@ public struct XcodeProject {
             if let settings = object.properties["buildSettings"] as? [String: Any] {
                 if let infoPlistSetting = settings["INFOPLIST_FILE"] as? String {
                     let setting = infoPlistSetting.replacingOccurrences(
-                        of: "$(SRCROOT)", with: rootUrl.standardized.path
+                        of: "$(SRCROOT)", with: location.root.standardized.path
                     )
                     if file.url.standardized.path.hasSuffix(setting) {
                         return true
