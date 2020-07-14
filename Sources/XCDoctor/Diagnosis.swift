@@ -188,7 +188,7 @@ private func resources(in project: XcodeProject) -> [Resource] {
     }
 }
 
-extension URL {
+private extension URL {
     /**
      Return true if the url points to a directory containing a `Contents.json` file.
      */
@@ -196,10 +196,25 @@ extension URL {
         FileManager.default.fileExists(atPath:
             appendingPathComponent("Contents.json").path)
     }
+}
 
-    var isDirectory: Bool {
-        let values = try? resourceValues(forKeys: [.isDirectoryKey])
-        return values?.isDirectory ?? false
+private extension String {
+    func stripped(matchingExpressions expressions: [NSRegularExpression]) -> String {
+        var str = self
+        for expr in expressions {
+            var match = expr.firstMatch(
+                in: str,
+                range: NSRange(location: 0, length: str.utf16.count)
+            )
+            while match != nil {
+                str.replaceSubrange(Range(match!.range, in: str)!, with: "")
+                match = expr.firstMatch(
+                    in: str,
+                    range: NSRange(location: 0, length: str.utf16.count)
+                )
+            }
+        }
+        return str
     }
 }
 
@@ -327,7 +342,7 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
             //       similarly, xml has another kind of comment which should also be stripped
             //       but, again, only for certain kinds of files
             //       for now, this just applies to any file we search through
-            let strippedFileContents = strip(text: fileContents, matchingExpressions: [
+            let strippedFileContents = fileContents.stripped(matchingExpressions: [
                 // note prioritized order: strip block comments before line comments
                 // note the #..# to designate a raw string, allowing the \* literal
                 // swiftformat:disable all
@@ -428,16 +443,4 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
         }
     }
     return nil
-}
-
-private func strip(text: String, matchingExpressions expressions: [NSRegularExpression]) -> String {
-    var str = text
-    for expr in expressions {
-        var match = expr.firstMatch(in: str, range: NSRange(location: 0, length: str.utf16.count))
-        while match != nil {
-            str.replaceSubrange(Range(match!.range, in: str)!, with: "")
-            match = expr.firstMatch(in: str, range: NSRange(location: 0, length: str.utf16.count))
-        }
-    }
-    return str
 }
