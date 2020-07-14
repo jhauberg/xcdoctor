@@ -21,7 +21,8 @@ class XcodeProjectTests: XCTestCase {
     }
 
     func testProjectNotFoundInNonExistentPath() {
-        let result = XcodeProject.openAndEvaluate(from: URL(fileURLWithPath: "~/Some/Project.xcodeproj"))
+        let result = XcodeProject
+            .openAndEvaluate(from: URL(fileURLWithPath: "~/Some/Project.xcodeproj"))
         XCTAssertThrowsError(try result.get()) { error in
             XCTAssertEqual(
                 error as! XcodeProjectError,
