@@ -337,12 +337,8 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
             } catch {
                 continue
             }
-            // TODO: this ideally only applies to *certain* source-files;
-            //       e.g. only actual code files
-            //       similarly, xml has another kind of comment which should also be stripped
-            //       but, again, only for certain kinds of files
-            //       for now, this just applies to any file we search through
-            let strippedFileContents = fileContents.stripped(matchingExpressions: [
+
+            var patterns = [
                 // note prioritized order: strip block comments before line comments
                 // note the #..# to designate a raw string, allowing the \* literal
                 // swiftformat:disable all
@@ -355,7 +351,23 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
                     "(?:\n|$)",    // until reaching end of string or a newline
                                          options: [.anchorsMatchLines]),
                 // swiftformat:enable all
-            ])
+            ]
+
+            if source.kind == "text.plist.xml" || source.url.pathExtension == "plist",
+                project.referencesPropertyListAsInfoPlist(named: source) {
+                patterns.append(
+                    try! NSRegularExpression(pattern:
+                        "<key>UIAppFonts</key>.+?</array>",
+                                             options: [.dotMatchesLineSeparators])
+                )
+            }
+
+            // TODO: this ideally only applies to *certain* source-files;
+            //       e.g. only actual code files
+            //       similarly, xml has another kind of comment which should also be stripped
+            //       but, again, only for certain kinds of files
+            //       for now, this just applies to any file we search through
+            let strippedFileContents = fileContents.stripped(matchingExpressions: patterns)
 
             res = res.filter { resource -> Bool in
                 for resourceName in resource.nameVariants {
