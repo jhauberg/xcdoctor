@@ -176,6 +176,7 @@ private func resources(in project: XcodeProject) -> [Resource] {
     return project.files.filter { ref -> Bool in
         // TODO: specific exclusions? e.g. "archive.ar"/"a", ".whatever" etc
         ref.hasTargetMembership &&
+            ref.kind != "wrapper.framework" &&
             ref.url.pathExtension != "a" &&
             ref.url.pathExtension != "xcconfig" &&
             !ref.url.lastPathComponent.hasPrefix(".") &&
