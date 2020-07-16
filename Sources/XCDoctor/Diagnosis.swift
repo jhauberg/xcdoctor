@@ -420,8 +420,8 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
                 conclusion: "unused resources",
                 help: """
                 These files might not be used; consider whether they should be removed.
-                Note that this diagnosis is prone to false-positives as it can't
-                realistically detect all usage patterns with certainty.
+                Note that this diagnosis is prone to false-positives as it can't realistically
+                detect all usage patterns with certainty. Proceed with caution.
                 """,
                 cases: res.map { resource -> String in
                     // prefer name including extension, as this can help distinguish
