@@ -64,15 +64,18 @@ struct Doctor: ParsableCommand {
                 .appendingPathComponent(xcodeproj)
         }
 
+        let opening: XcodeProject.EventCallback? = verbose ? { name in
+            printdiag(text: "Opening \(name) ...")
+        } : nil
+        let evaluating: XcodeProject.EventCallback? = verbose ? { name in
+            printdiag(text: "Evaluating \(name) ...")
+        } : nil
+
         let project: XcodeProject
         switch XcodeProject.openAndEvaluate(
             from: url,
-            beforeOpeningProject: { name in
-                printdiag(text: "Opening \(name) ...")
-            },
-            beforeEvaluatingProject: { name in
-                printdiag(text: "Evaluating \(name) ...")
-            }
+            beforeOpeningProject: opening,
+            beforeEvaluatingProject: evaluating
         ) {
         case let .success(xcodeProject):
             project = xcodeProject
