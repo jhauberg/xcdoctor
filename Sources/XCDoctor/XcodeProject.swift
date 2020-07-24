@@ -350,7 +350,7 @@ private func productReferences(among objects: [PBXObject]) -> [ProductReference]
     return productRefs
 }
 
-public struct XcodeProject {
+public final class XcodeProject {
     public typealias EventCallback = (String) -> Void
     /**
      Attempts to locate and evaluate an Xcode project at a given URL.
