@@ -341,27 +341,44 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
                 continue
             }
 
-            var patterns = [
-                // note prioritized order: strip block comments before line comments
-                // note the #..# to designate a raw string, allowing the \* literal
-                // swiftformat:disable all
-                try! NSRegularExpression(pattern:
-                    #"/\*(?:.|[\n])*?\*/"#),
-                try! NSRegularExpression(pattern:
-                    "(?:[^:]|^)" + // avoid matching URLs in code, but anything else goes
-                    "//" +         // starting point of a single-line comment
-                    ".*?" +        // anything following
-                    "(?:\n|$)",    // until reaching end of string or a newline
-                                         options: [.anchorsMatchLines]),
-                // swiftformat:enable all
-            ]
+            var patterns: [NSRegularExpression] = []
 
-            if source.kind == "text.plist.xml" || source.url.pathExtension == "plist",
-                project.referencesPropertyListAsInfoPlist(named: source) {
+            if let kind = source.kind, kind.starts(with: "sourcecode") {
+                patterns.append(contentsOf: [
+                    // note prioritized order: strip block comments before line comments
+                    // note the #..# to designate a raw string, allowing the \* literal
+                    // swiftformat:disable all
+                    try! NSRegularExpression(pattern:
+                        // strip block comments
+                        #"/\*(?:.|[\n])*?\*/"#),
+                    try! NSRegularExpression(pattern:
+                        // strip line comments
+                        "(?:[^:]|^)" + // avoid matching URLs in code, but anything else goes
+                        "//" +         // starting point of a single-line comment
+                        ".*?" +        // anything following
+                        "(?:\n|$)",    // until reaching end of string or a newline
+                                             options: [.anchorsMatchLines]),
+                    // swiftformat:enable all
+                ])
+            }
+
+            if source.kind == "text.xml" || source.kind == "text.html" ||
+                source.url.pathExtension == "xml" || source.url.pathExtension == "html"
+            {
                 patterns.append(
                     try! NSRegularExpression(pattern:
+                        // strip HTML/XML comments
+                        "<!--.+?-->",
+                        options: [.dotMatchesLineSeparators])
+                )
+            } else if source.kind == "text.plist.xml" || source.url.pathExtension == "plist",
+                project.referencesPropertyListAsInfoPlist(named: source)
+            {
+                patterns.append(
+                    try! NSRegularExpression(pattern:
+                        // strip this particular and iOS specific plist-entry
                         "<key>UIAppFonts</key>.+?</array>",
-                                             options: [.dotMatchesLineSeparators])
+                        options: [.dotMatchesLineSeparators])
                 )
             }
 
