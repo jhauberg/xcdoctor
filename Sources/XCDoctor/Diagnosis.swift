@@ -277,7 +277,14 @@ private final class SourcePatterns {
         options: [.dotMatchesLineSeparators])
 }
 
-public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
+// TODO: optionally include some info, Any? for printout under DEBUG/verbose
+public typealias ExaminationProgressCallback = (Bool) -> Void
+
+public func examine(
+    project: XcodeProject,
+    for defect: Defect,
+    progress: ExaminationProgressCallback? = nil
+) -> Diagnosis? {
     switch defect {
     case .nonExistentFiles:
         let filePaths = nonExistentFilePaths(in: project)
@@ -363,6 +370,7 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
     case .unusedResources:
         var res = resources(in: project) + assets(in: project)
         for source in sourceFiles(in: project) {
+            progress?(false)
             let fileContents: String
             do {
                 fileContents = try String(contentsOf: source.url)
@@ -436,6 +444,7 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
             }
             return true // resource seems to be unused; keep searching for usages
         }
+        progress?(true)
         if !res.isEmpty {
             return Diagnosis(
                 conclusion: "unused resources",
