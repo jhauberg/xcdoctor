@@ -137,7 +137,8 @@ private func parent(of object: PBXObject, in groups: [PBXObject]) -> PBXObject? 
 
 private func resolveProjectURL(object: PBXObject, groups: [PBXObject]) -> URL? {
     guard var path = object.properties["name"] as? String ?? object
-        .properties["path"] as? String else {
+        .properties["path"] as? String
+    else {
         return nil
     }
 
@@ -145,7 +146,8 @@ private func resolveProjectURL(object: PBXObject, groups: [PBXObject]) -> URL? {
     while let parent = parent(of: ref, in: groups) {
         if let parentPath = parent.properties["name"] as? String ?? parent
             .properties["path"] as? String,
-            !parentPath.isEmpty {
+            !parentPath.isEmpty
+        {
             path = "\(parentPath)/\(path)"
         }
         ref = parent
@@ -160,7 +162,8 @@ private func resolveFileURL(
     fromProjectLocation location: XcodeProjectLocation
 ) -> URL? {
     guard let sourceTree = object.properties["sourceTree"] as? String,
-        var path = object.properties["path"] as? String else {
+        var path = object.properties["path"] as? String
+    else {
         return nil
     }
     switch sourceTree {
@@ -218,7 +221,8 @@ private func objectReferences(in objectGraph: [String: Any]) -> [PBXObject] {
 }
 
 private func objectsIdentifying(as identities: [String],
-                                among objects: [PBXObject]) -> [PBXObject] {
+                                among objects: [PBXObject]) -> [PBXObject]
+{
     objects.filter { object -> Bool in
         if let identity = object.properties["isa"] as? String {
             return identities.contains(identity)
@@ -291,11 +295,13 @@ private func groupReferences(
     let groupObjects = objectsIdentifying(as: ["PBXGroup", "PBXVariantGroup"], among: objects)
     for group in groupObjects {
         guard let children = group.properties["children"] as? [String],
-            let projectUrl = resolveProjectURL(object: group, groups: groupObjects) else {
+            let projectUrl = resolveProjectURL(object: group, groups: groupObjects)
+        else {
             continue
         }
         guard let name = group.properties["name"] as? String ??
-            group.properties["path"] as? String else {
+            group.properties["path"] as? String
+        else {
             continue
         }
         let directoryUrl = resolveFileURL(
@@ -365,7 +371,8 @@ public final class XcodeProject {
         beforeOpeningProject: EventCallback? = nil,
         beforeEvaluatingProject: EventCallback? = nil
     )
-        -> Result<XcodeProject, XcodeProjectError> {
+        -> Result<XcodeProject, XcodeProjectError>
+    {
         let projectLocation: XcodeProjectLocation
         switch findProjectLocation(from: url) {
         case let .success(location):
@@ -414,7 +421,8 @@ public final class XcodeProject {
         for object in buildConfigurations {
             if let settings = object.properties["buildSettings"] as? [String: Any] {
                 if let appIconSetting =
-                    settings["ASSETCATALOG_COMPILER_APPICON_NAME"] as? String {
+                    settings["ASSETCATALOG_COMPILER_APPICON_NAME"] as? String
+                {
                     if appIconSetting == asset {
                         return true
                     }

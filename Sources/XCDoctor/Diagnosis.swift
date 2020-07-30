@@ -254,6 +254,29 @@ private func assets(in project: XcodeProject) -> [Resource] {
     }
 }
 
+private final class SourcePatterns {
+    static let blockComments =
+        try! NSRegularExpression(pattern:
+            // note the #..# to designate a raw string, allowing the \* literal
+            #"/\*(?:.|[\n])*?\*/"#)
+    static let lineComments =
+        try! NSRegularExpression(pattern:
+            "(?:[^:]|^)" + // avoid matching URLs in code, but anything else goes
+                "//" + // starting point of a single-line comment
+                ".*?" + // anything following
+                "(?:\n|$)", // until reaching end of string or a newline
+            options: [.anchorsMatchLines])
+    static let htmlComments =
+        try! NSRegularExpression(pattern:
+            // strip HTML/XML comments
+            "<!--.+?-->",
+            options: [.dotMatchesLineSeparators])
+    static let appFonts = try! NSRegularExpression(pattern:
+        // strip this particular and iOS specific plist-entry
+        "<key>UIAppFonts</key>.+?</array>",
+        options: [.dotMatchesLineSeparators])
+}
+
 public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
     switch defect {
     case .nonExistentFiles:
@@ -339,26 +362,6 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
         }
     case .unusedResources:
         var res = resources(in: project) + assets(in: project)
-        let blockCommentPattern =
-            try! NSRegularExpression(pattern:
-                // note the #..# to designate a raw string, allowing the \* literal
-                #"/\*(?:.|[\n])*?\*/"#)
-        let lineCommentPattern =
-            try! NSRegularExpression(pattern:
-                "(?:[^:]|^)" + // avoid matching URLs in code, but anything else goes
-                    "//" + // starting point of a single-line comment
-                    ".*?" + // anything following
-                    "(?:\n|$)", // until reaching end of string or a newline
-                options: [.anchorsMatchLines])
-        let htmlCommentPattern =
-            try! NSRegularExpression(pattern:
-                // strip HTML/XML comments
-                "<!--.+?-->",
-                options: [.dotMatchesLineSeparators])
-        let appFontsPattern = try! NSRegularExpression(pattern:
-            // strip this particular and iOS specific plist-entry
-            "<key>UIAppFonts</key>.+?</array>",
-            options: [.dotMatchesLineSeparators])
         for source in sourceFiles(in: project) {
             let fileContents: String
             do {
@@ -372,16 +375,16 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
             if let kind = source.kind, kind.starts(with: "sourcecode") {
                 patterns.append(contentsOf: [
                     // note prioritized order: strip block comments before line comments
-                    blockCommentPattern, lineCommentPattern,
+                    SourcePatterns.blockComments, SourcePatterns.lineComments,
                 ])
             } else if source.kind == "text.xml" || source.kind == "text.html" ||
                 source.url.pathExtension == "xml" || source.url.pathExtension == "html"
             {
-                patterns.append(htmlCommentPattern)
+                patterns.append(SourcePatterns.htmlComments)
             } else if source.kind == "text.plist.xml" || source.url.pathExtension == "plist",
                 project.referencesPropertyListAsInfoPlist(named: source)
             {
-                patterns.append(appFontsPattern)
+                patterns.append(SourcePatterns.appFonts)
             }
 
             let strippedFileContents = fileContents
