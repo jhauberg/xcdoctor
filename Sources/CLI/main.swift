@@ -112,7 +112,9 @@ struct Doctor: ParsableCommand {
         for condition in conditions {
             if verbose {
                 // save column at end for activity indication
-                let position = "\u{1B}[s"
+                // note that this is assumed to be _before_ end (e.g. newline)
+                // note ESC 7, not CSI s - this is compatible with Terminal.app
+                let position = "\u{1B}7"
 
                 printdiag(text: "Examining for \(condition) ... \(position)")
             }
@@ -127,7 +129,10 @@ struct Doctor: ParsableCommand {
                 }
 
                 // move cursor to previous line at saved column and clear to end
-                let position = "\u{1B}[u\u{1B}[1A\u{1B}[K"
+                // (also clearing any newline)
+                // note ESC 8, not CSI u - this is compatible with Terminal.app
+                // note that this does not work correctly if output causes display to scroll
+                let position = "\u{1B}8\u{1B}[1A\u{1B}[K"
 
                 printdiag(text: "\(position)\(message)")
             } : nil
