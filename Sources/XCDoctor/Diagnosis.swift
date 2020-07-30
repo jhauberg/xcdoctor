@@ -255,11 +255,9 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
         if !filePaths.isEmpty {
             return Diagnosis(
                 conclusion: "non-existent files",
-                // TODO: this text should be wrapped at X columns; can do manually, but ...
                 help: """
-                These files might have been moved or removed from the filesystem.
-                In either case, each reference should be removed from the project;
-                if a file has been moved, add back the file from its new location.
+                These files are not present on the filesystem and could have been moved or removed.
+                In either case, each reference should be resolved or removed from the project.
                 """,
                 cases: filePaths
             )
