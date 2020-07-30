@@ -18,6 +18,8 @@ private let sourceTypes: [(String, [String])] = [
     ("folder.assetcatalog", ["xcassets"]),
     ("text.plist.strings", ["strings"]),
     ("text.plist.xml", ["plist"]),
+    ("text.xml", ["xml"]),
+    ("text.html", ["html"]),
     ("sourcecode.c.c", ["c"]),
     ("sourcecode.c.h", ["h", "pch"]),
     ("sourcecode.c.objc", ["m"]),

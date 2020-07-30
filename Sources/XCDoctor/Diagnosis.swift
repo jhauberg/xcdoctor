@@ -176,7 +176,13 @@ private struct Resource {
 }
 
 private func resources(in project: XcodeProject) -> [Resource] {
-    let sources = sourceFiles(in: project)
+    let sources = sourceFiles(in: project).filter { ref -> Bool in
+        // exclude xml/html files as sources; consider them both source and resource
+        // TODO: this is a bit of a slippery slope; where do we draw the line?
+        //       stuff like JSON and YAML probably fits here as well, etc. etc. ...
+        ref.kind != "text.xml" && ref.url.pathExtension != "xml" &&
+            ref.kind != "text.html" && ref.url.pathExtension != "html"
+    }
     return project.files.filter { ref -> Bool in
         // TODO: specific exclusions? e.g. "archive.ar"/"a", ".whatever" etc
         ref.hasTargetMembership &&
