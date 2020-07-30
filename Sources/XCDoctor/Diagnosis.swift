@@ -333,6 +333,26 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
         }
     case .unusedResources:
         var res = resources(in: project) + assets(in: project)
+        let blockCommentPattern =
+            try! NSRegularExpression(pattern:
+                // note the #..# to designate a raw string, allowing the \* literal
+                #"/\*(?:.|[\n])*?\*/"#)
+        let lineCommentPattern =
+            try! NSRegularExpression(pattern:
+                "(?:[^:]|^)" + // avoid matching URLs in code, but anything else goes
+                    "//" + // starting point of a single-line comment
+                    ".*?" + // anything following
+                    "(?:\n|$)", // until reaching end of string or a newline
+                options: [.anchorsMatchLines])
+        let htmlCommentPattern =
+            try! NSRegularExpression(pattern:
+                // strip HTML/XML comments
+                "<!--.+?-->",
+                options: [.dotMatchesLineSeparators])
+        let appFontsPattern = try! NSRegularExpression(pattern:
+            // strip this particular and iOS specific plist-entry
+            "<key>UIAppFonts</key>.+?</array>",
+            options: [.dotMatchesLineSeparators])
         for source in sourceFiles(in: project) {
             let fileContents: String
             do {
@@ -346,62 +366,27 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
             if let kind = source.kind, kind.starts(with: "sourcecode") {
                 patterns.append(contentsOf: [
                     // note prioritized order: strip block comments before line comments
-                    // note the #..# to designate a raw string, allowing the \* literal
-                    // swiftformat:disable all
-                    try! NSRegularExpression(pattern:
-                        // strip block comments
-                        #"/\*(?:.|[\n])*?\*/"#),
-                    try! NSRegularExpression(pattern:
-                        // strip line comments
-                        "(?:[^:]|^)" + // avoid matching URLs in code, but anything else goes
-                        "//" +         // starting point of a single-line comment
-                        ".*?" +        // anything following
-                        "(?:\n|$)",    // until reaching end of string or a newline
-                                             options: [.anchorsMatchLines]),
-                    // swiftformat:enable all
+                    blockCommentPattern, lineCommentPattern,
                 ])
-            }
-
-            if source.kind == "text.xml" || source.kind == "text.html" ||
+            } else if source.kind == "text.xml" || source.kind == "text.html" ||
                 source.url.pathExtension == "xml" || source.url.pathExtension == "html"
             {
-                patterns.append(
-                    try! NSRegularExpression(pattern:
-                        // strip HTML/XML comments
-                        "<!--.+?-->",
-                        options: [.dotMatchesLineSeparators])
-                )
+                patterns.append(htmlCommentPattern)
             } else if source.kind == "text.plist.xml" || source.url.pathExtension == "plist",
                 project.referencesPropertyListAsInfoPlist(named: source)
             {
-                patterns.append(
-                    try! NSRegularExpression(pattern:
-                        // strip this particular and iOS specific plist-entry
-                        "<key>UIAppFonts</key>.+?</array>",
-                        options: [.dotMatchesLineSeparators])
-                )
+                patterns.append(appFontsPattern)
             }
 
-            // TODO: this ideally only applies to *certain* source-files;
-            //       e.g. only actual code files
-            //       similarly, xml has another kind of comment which should also be stripped
-            //       but, again, only for certain kinds of files
-            //       for now, this just applies to any file we search through
             let strippedFileContents = fileContents
                 .removingOccurrences(matchingExpressions: patterns)
 
             res = res.filter { resource -> Bool in
                 for resourceName in resource.nameVariants {
                     let searchStrings: [String]
-                    if source.kind == "text.plist.xml" || source.url.pathExtension == "plist" {
-                        // search without quotes in property-lists; typically text in node contents
-                        // e.g. "<key>Icon10</key>"
-                        searchStrings = ["\(resourceName)"]
-                    } else {
-                        // search with quotes in anything else; typically referenced as strings
-                        // in sourcecode and string attributes in xml (xib/storyboard)
-                        // e.g. `UIImage(named: "Icon10")`, or
-                        //      `<imageView ... image="Icon10" ...>`
+                    if let kind = source.kind, kind.starts(with: "sourcecode") {
+                        // search for quoted strings in anything considered sourcecode;
+                        // e.g. `UIImage(named: "Icon10")`
                         // however, consider the case:
                         //      `loadspr("res/monster.png")`
                         // here, the resource is actually "monster.png", but a build/copy phase
@@ -411,11 +396,18 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
                         // the end, which should work out no matter the destination, while
                         // still being decently specific; e.g.
                         //      `/monster.png"`
-                        // TODO: a resource might be referenced in another resource; this search
-                        //       does not take that into account; it would also need to distinguish
-                        //       between text and binary; e.g. a png file should not be searched,
-                        //       but an xml file should
                         searchStrings = ["\"\(resourceName)\"", "/\(resourceName)\""]
+                    } else if source.kind == "text.plist.xml" ||
+                        source.url.pathExtension == "plist"
+                    {
+                        // search property-lists; typically only node contents
+                        // e.g. "<key>Icon10</key>"
+                        searchStrings = [">\(resourceName)<"]
+                    } else {
+                        // search any other text-based source; quoted strings and node content
+                        // e.g. "<key>Icon10</key>"
+                        //      "<key attr="Icon10">asdasd</key>"
+                        searchStrings = ["\"\(resourceName)\"", ">\(resourceName)<"]
                     }
                     for searchString in searchStrings {
                         if strippedFileContents.contains(searchString) {
