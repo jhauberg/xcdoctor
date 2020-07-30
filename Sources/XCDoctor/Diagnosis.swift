@@ -143,6 +143,14 @@ private func sourceFiles(in project: XcodeProject) -> [FileReference] {
     }
 }
 
+private extension String {
+    var removingScaleFactors: String {
+        replacingOccurrences(of: "@1x", with: "")
+            .replacingOccurrences(of: "@2x", with: "")
+            .replacingOccurrences(of: "@3x", with: "")
+    }
+}
+
 private struct Resource {
     let name: String
     let fileName: String?
@@ -151,21 +159,17 @@ private struct Resource {
         self.name = name
         self.fileName = fileName
         if let fileName = fileName {
-            let plainFileName = fileName
-                .replacingOccurrences(of: "@1x", with: "")
-                .replacingOccurrences(of: "@2x", with: "")
-                .replacingOccurrences(of: "@3x", with: "")
-            let plainName = name
-                .replacingOccurrences(of: "@1x", with: "")
-                .replacingOccurrences(of: "@2x", with: "")
-                .replacingOccurrences(of: "@3x", with: "")
+            let plainName = name.removingScaleFactors
+            let plainFileName = fileName.removingScaleFactors
             nameVariants = Array(Set([
                 name,
-                plainName,
                 fileName,
+                plainName,
                 plainFileName,
             ]))
         } else {
+            // if a filename has not been set, we can be reasonably certain that
+            // this is not a file that has assigned scale factors
             nameVariants = [name]
         }
     }
@@ -200,7 +204,7 @@ private extension URL {
 }
 
 private extension String {
-    func stripped(matchingExpressions expressions: [NSRegularExpression]) -> String {
+    func removingOccurrences(matchingExpressions expressions: [NSRegularExpression]) -> String {
         var str = self
         for expr in expressions {
             var match = expr.firstMatch(
@@ -368,7 +372,8 @@ public func examine(project: XcodeProject, for defect: Defect) -> Diagnosis? {
             //       similarly, xml has another kind of comment which should also be stripped
             //       but, again, only for certain kinds of files
             //       for now, this just applies to any file we search through
-            let strippedFileContents = fileContents.stripped(matchingExpressions: patterns)
+            let strippedFileContents = fileContents
+                .removingOccurrences(matchingExpressions: patterns)
 
             res = res.filter { resource -> Bool in
                 for resourceName in resource.nameVariants {
