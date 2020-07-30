@@ -111,26 +111,32 @@ struct Doctor: ParsableCommand {
         ]
         for condition in conditions {
             if verbose {
-                var diagnostic = "Examining for \(condition) ... \u{1B}[s" // save column at end for activity indication
-                if condition == .unusedResources {
-                    diagnostic += "This may take a while \u{1B}[s"
-                }
-                printdiag(text: diagnostic)
+                // save column at end for activity indication
+                let position = "\u{1B}[s"
+
+                printdiag(text: "Examining for \(condition) ... \(position)")
             }
 
-            let indicateActivity: ExaminationProgressCallback? = verbose ? { finished in
-                // TODO: consider doing a "[10/52]" kind of progress instead;
-                //       that doesn't need to be cleared at end => simpler
-                //       and it provides much more information besides just activity
-                if finished {
-                    printdiag(text: "\u{1B}[u\u{1B}[1A ") // clear the indicator by whitespace
+            let activity: ExaminationProgressCallback? = verbose ? { n, total, info in
+                let indicator = "[\(n)/\(total)]"
+                let message: String
+                if let info = info {
+                    message = "\(indicator) \(info)"
                 } else {
-                    let c = Int.random(in: 0...1) == 0 ? "/" : "\\"
-                    printdiag(text: "\u{1B}[u\u{1B}[1A\(c)") // move cursor to previous line at saved column
+                    message = "\(indicator)"
                 }
+
+                // move cursor to previous line at saved column and clear to end
+                let position = "\u{1B}[u\u{1B}[1A\u{1B}[K"
+
+                printdiag(text: "\(position)\(message)")
             } : nil
 
-            if let diagnosis = examine(project: project, for: condition, progress: indicateActivity) {
+            if let diagnosis = examine(
+                project: project,
+                for: condition,
+                progress: activity
+            ) {
                 if let references = diagnosis.cases?.sorted() {
                     for reference in references {
                         printdiag(text: reference, kind: .note)

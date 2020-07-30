@@ -278,7 +278,7 @@ private final class SourcePatterns {
 }
 
 // TODO: optionally include some info, Any? for printout under DEBUG/verbose
-public typealias ExaminationProgressCallback = (Bool) -> Void
+public typealias ExaminationProgressCallback = (Int, Int, String?) -> Void
 
 public func examine(
     project: XcodeProject,
@@ -326,7 +326,13 @@ public func examine(
     case .corruptPropertyLists:
         let files = propertyListReferences(in: project)
         var corruptedFilePaths: [String] = []
-        for file in files {
+        for (n, file) in files.enumerated() {
+            #if DEBUG
+            progress?(n + 1, files.count, file.url.lastPathComponent)
+            #else
+            progress?(n + 1, files.count, nil)
+            #endif
+
             do {
                 _ = try PropertyListSerialization.propertyList(
                     from: try Data(contentsOf: file.url),
@@ -346,6 +352,9 @@ public func examine(
                 corruptedFilePaths.append("\(file.path): \(additionalInfo)")
             }
         }
+
+        progress?(files.count, files.count, nil)
+
         if !corruptedFilePaths.isEmpty {
             return Diagnosis(
                 conclusion: "corrupted plists",
@@ -369,8 +378,14 @@ public func examine(
         }
     case .unusedResources:
         var res = resources(in: project) + assets(in: project)
-        for source in sourceFiles(in: project) {
-            progress?(false)
+        let sources = sourceFiles(in: project)
+        for (n, source) in sources.enumerated() {
+            #if DEBUG
+            progress?(n + 1, sources.count, source.url.lastPathComponent)
+            #else
+            progress?(n + 1, sources.count, nil)
+            #endif
+
             let fileContents: String
             do {
                 fileContents = try String(contentsOf: source.url)
@@ -444,7 +459,9 @@ public func examine(
             }
             return true // resource seems to be unused; keep searching for usages
         }
-        progress?(true)
+
+        progress?(sources.count, sources.count, nil)
+
         if !res.isEmpty {
             return Diagnosis(
                 conclusion: "unused resources",
