@@ -12,7 +12,7 @@ let package = Package(
         .library(name: "XCDoctor", targets: ["XCDoctor"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-argument-parser", from: "0.2.0"),
+        .package(url: "https://github.com/apple/swift-argument-parser", from: "0.2.1"),
     ],
     targets: [
         .target(
