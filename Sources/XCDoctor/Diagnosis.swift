@@ -378,6 +378,16 @@ public func examine(
         }
     case .unusedResources:
         var res = resources(in: project) + assets(in: project)
+        // find special cases, e.g. AppIcon
+        res = res.filter { resource -> Bool in
+            for resourceName in resource.nameVariants {
+                if project.referencesAssetAsAppIcon(named: resourceName) {
+                    return false // resource seems to be used; don't search further for this
+                }
+            }
+            return true // resource seems to be unused; keep searching for usages
+        }
+        // full-text search every source-file
         let sources = sourceFiles(in: project)
         for (n, source) in sources.enumerated() {
             #if DEBUG
@@ -449,15 +459,6 @@ public func examine(
                 }
                 return true // resource seems to be unused; keep searching for usages
             }
-        }
-        // find special cases, e.g. AppIcon
-        res = res.filter { resource -> Bool in
-            for resourceName in resource.nameVariants {
-                if project.referencesAssetAsAppIcon(named: resourceName) {
-                    return false // resource seems to be used; don't search further for this
-                }
-            }
-            return true // resource seems to be unused; keep searching for usages
         }
 
         progress?(sources.count, sources.count, nil)
