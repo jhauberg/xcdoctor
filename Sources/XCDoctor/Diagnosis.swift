@@ -137,9 +137,11 @@ private func danglingFilePaths(in project: XcodeProject) -> [String] {
 private func sourceFiles(in project: XcodeProject) -> [FileReference] {
     let exceptFiles = nonExistentFiles(in: project)
     return project.files.filter { ref -> Bool in
-        ref.isSourceFile && !exceptFiles.contains(where: { otherRef -> Bool in
-            ref.url == otherRef.url
-        })
+        ref.isSourceFile && // file is compiled in one way or another
+            !ref.url.isDirectory && // file is text-based; i.e. not a directory
+            !exceptFiles.contains(where: { otherRef -> Bool in // file exists
+                ref.url == otherRef.url
+            })
     }
 }
 
@@ -186,11 +188,13 @@ private func resources(in project: XcodeProject) -> [Resource] {
     return project.files.filter { ref -> Bool in
         // TODO: specific exclusions? e.g. "archive.ar"/"a", ".whatever" etc
         ref.hasTargetMembership &&
-            ref.kind != "wrapper.framework" &&
-            ref.url.pathExtension != "a" &&
-            ref.url.pathExtension != "xcconfig" &&
-            !ref.url.lastPathComponent.hasPrefix(".") &&
-            !sources.contains { sourceRef -> Bool in
+            ref.kind != "folder.assetcatalog" && // not an assetcatalog
+            ref.url.pathExtension != "xcassets" && // not an assetcatalog
+            ref.kind != "wrapper.framework" && // not a dynamic framework
+            ref.url.pathExtension != "a" && // not a static library
+            ref.url.pathExtension != "xcconfig" && // not xcconfig
+            !ref.url.lastPathComponent.hasPrefix(".") && // not a hidden file
+            !sources.contains { sourceRef -> Bool in // not a source-file
                 ref.url == sourceRef.url
             }
     }.map { ref -> Resource in
@@ -328,9 +332,9 @@ public func examine(
         var corruptedFilePaths: [String] = []
         for (n, file) in files.enumerated() {
             #if DEBUG
-            progress?(n + 1, files.count, file.url.lastPathComponent)
+                progress?(n + 1, files.count, file.url.lastPathComponent)
             #else
-            progress?(n + 1, files.count, nil)
+                progress?(n + 1, files.count, nil)
             #endif
 
             do {
@@ -393,9 +397,9 @@ public func examine(
         let sources = sourceFiles(in: project)
         for (n, source) in sources.enumerated() {
             #if DEBUG
-            progress?(n + 1, sources.count, source.url.lastPathComponent)
+                progress?(n + 1, sources.count, source.url.lastPathComponent)
             #else
-            progress?(n + 1, sources.count, nil)
+                progress?(n + 1, sources.count, nil)
             #endif
 
             let fileContents: String

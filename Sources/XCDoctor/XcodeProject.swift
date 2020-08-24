@@ -15,6 +15,7 @@ import Foundation
 private let sourceTypes: [(String, [String])] = [
     ("file.storyboard", ["storyboard"]),
     ("file.xib", ["xib", "nib"]),
+    // TODO: technically assetcatalog is not a source-file, but included to enable dangling check
     ("folder.assetcatalog", ["xcassets"]),
     ("text.plist.strings", ["strings"]),
     ("text.plist.xml", ["plist"]),
