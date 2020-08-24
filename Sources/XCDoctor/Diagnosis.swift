@@ -379,13 +379,15 @@ public func examine(
     case .unusedResources:
         var res = resources(in: project) + assets(in: project)
         // find special cases, e.g. AppIcon
-        res = res.filter { resource -> Bool in
+        res.removeAll { resource -> Bool in
             for resourceName in resource.nameVariants {
                 if project.referencesAssetAsAppIcon(named: resourceName) {
-                    return false // resource seems to be used; don't search further for this
+                    // resource seems to be used; remove and don't search further for this
+                    return true
                 }
             }
-            return true // resource seems to be unused; keep searching for usages
+            // resource seems to be unused; don't remove and keep searching for usages
+            return false
         }
         // full-text search every source-file
         let sources = sourceFiles(in: project)
@@ -404,7 +406,6 @@ public func examine(
             }
 
             var patterns: [NSRegularExpression] = []
-
             if let kind = source.kind, kind.starts(with: "sourcecode") {
                 patterns.append(contentsOf: [
                     // note prioritized order: strip block comments before line comments
@@ -423,7 +424,7 @@ public func examine(
             let strippedFileContents = fileContents
                 .removingOccurrences(matchingExpressions: patterns)
 
-            res = res.filter { resource -> Bool in
+            res.removeAll { resource -> Bool in
                 for resourceName in resource.nameVariants {
                     let searchStrings: [String]
                     if let kind = source.kind, kind.starts(with: "sourcecode") {
@@ -453,11 +454,13 @@ public func examine(
                     }
                     for searchString in searchStrings {
                         if strippedFileContents.contains(searchString) {
-                            return false // resource seems to be used; don't search further for this
+                            // resource seems to be used; remove and don't search further for this
+                            return true
                         }
                     }
                 }
-                return true // resource seems to be unused; keep searching for usages
+                // resource seems to be unused; don't remove and keep searching for usages
+                return false
             }
         }
 
