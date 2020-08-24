@@ -296,7 +296,7 @@ public func examine(
             return Diagnosis(
                 conclusion: "non-existent files",
                 help: """
-                These files are not present on the filesystem and could have been moved or removed.
+                These files are not present on the file system and could have been moved or removed.
                 In either case, each reference should be resolved or removed from the project.
                 """,
                 cases: filePaths
