@@ -39,7 +39,7 @@ import ArgumentParser
 struct Doctor: ParsableCommand {
     static var configuration = CommandConfiguration(
         commandName: "xcdoctor",
-        version: "0.4.0"
+        version: "0.5.0"
     )
 
     @Argument(help:
