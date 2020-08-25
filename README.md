@@ -2,7 +2,7 @@
 
 A command-line tool that helps diagnosing your Xcode project for common defects.
 
-| [Latest release (0.5.0)](https://github.com/jhauberg/xcdoctor/releases/tag/0.5.0) | Download the latest stable release.                 |
+| [Latest release (0.5.1)](https://github.com/jhauberg/xcdoctor/releases/tag/0.5.1) | Download the latest stable release.                 |
 | :-------------------------------------------------------------------------------- | :-------------------------------------------------- |
 | [Issue tracker](https://github.com/jhauberg/xcdoctor/issues)                      | Contribute your bugs, comments or feature requests. |
 
