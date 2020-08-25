@@ -191,7 +191,9 @@ private func resolveFileURL(
         while let parent = parent(of: ref, in: groups) {
             if let parentPath = parent.properties["path"] as? String, !parentPath.isEmpty {
                 path = "\(parentPath)/\(path)"
-                let groupSourceTree = parent.properties["sourceTree"] as! String
+                guard let groupSourceTree = parent.properties["sourceTree"] as? String else {
+                    fatalError()
+                }
                 if groupSourceTree == "SOURCE_ROOT" {
                     // don't resolve further back, even if
                     // this group is a child of another group
@@ -239,8 +241,10 @@ private func fileReferences(
     var fileRefs: [FileReference] = []
     let groupObjects = objectsIdentifying(as: ["PBXGroup", "PBXVariantGroup"], among: objects)
     let buildFileReferences = objectsIdentifying(as: ["PBXBuildFile"], among: objects)
-        .map { object -> String in
-            object.properties["fileRef"] as! String
+        .compactMap{ object -> String? in
+            // TODO: note that linked frameworks appear with a "productRef" instead
+            //       - do we want to handle these in some way?
+            return object.properties["fileRef"] as? String
         }
 
     let excludedFileTypes = ["wrapper.xcdatamodel"]
