@@ -28,7 +28,7 @@ Then, copy the executable to `usr/local/bin`. You can either do this manually, o
 
 ```shell
 $ cd .build/release
-$ cp -f xcdoctor /user/local/bin/xcdoctor
+$ cp -f xcdoctor /usr/local/bin/xcdoctor
 ```
 
 ## Use
