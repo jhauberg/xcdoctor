@@ -14,9 +14,7 @@ A command-line tool that helps diagnosing your Xcode project for common defects.
 | :---------------------------------------------------------------------- | :-------------------------------------------- | :------ | :----------------- |
 | [swift-argument-parser](https://github.com/apple/swift-argument-parser) | Describe and manage a command-line interface. | 0.3.0   | Apache License 2.0 |
 
-<br />
-
-#### Manually
+### Manually
 
 **Requires Swift 5+**
 
@@ -26,14 +24,14 @@ First, build the program:
 $ swift build --configuration release
 ```
 
-Then, copy the executable to `/usr/local/bin`. You can either do this manually, or by running:
+Then, copy the executable to `/usr/local/bin` (or add it to `$PATH`):
 
 ```shell
 $ cd .build/release
 $ cp -f xcdoctor /usr/local/bin/xcdoctor
 ```
 
-#### Mint
+### Mint
 
 ```shell
 $ mint install jhauberg/xcdoctor
