@@ -16,6 +16,8 @@ A command-line tool that helps diagnosing your Xcode project for common defects.
 
 <br />
 
+#### Manually
+
 **Requires Swift 5+**
 
 First, build the program:
@@ -24,14 +26,20 @@ First, build the program:
 $ swift build --configuration release
 ```
 
-Then, copy the executable to `usr/local/bin`. You can either do this manually, or by running:
+Then, copy the executable to `/usr/local/bin`. You can either do this manually, or by running:
 
 ```shell
 $ cd .build/release
 $ cp -f xcdoctor /usr/local/bin/xcdoctor
 ```
 
-## Use
+#### Mint
+
+```shell
+$ mint install jhauberg/xcdoctor
+```
+
+## Usage
 
 If `xcdoctor` was installed as expected, you can now run `xcdoctor`:
 
@@ -68,7 +76,7 @@ The purpose of an examination is to discover and identify defects in an Xcode pr
 
 This process includes resolving and validating file/group references, determining unused resources and more. For a complete list of checks, see [Diagnosis.swift](https://github.com/jhauberg/xcdoctor/blob/master/Sources/XCDoctor/Diagnosis.swift#L14-L49).
 
-**No files are touched during an examination**, and the user must manually take action on any reported defects.
+**No files are touched during an examination;** the user must manually take action on any reported defects.
 
 # Diagnosis
 
