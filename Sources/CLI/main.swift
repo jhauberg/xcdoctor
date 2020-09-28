@@ -52,7 +52,11 @@ struct Doctor: ParsableCommand {
         """)
     var xcodeproj: String
 
-    @Flag(name: .shortAndLong, help: "Show diagnostic messages.")
+    @Flag(name: .shortAndLong,
+          help:
+          """
+          Show diagnostic messages.
+          """)
     var verbose: Bool = false
 
     mutating func run() throws {
@@ -83,6 +87,10 @@ struct Doctor: ParsableCommand {
             switch error {
             case let .incompatible(reason):
                 printdiag(text: "\(url.standardized.path): \(reason)")
+            case let .notSpecified(projectFiles):
+                printdiag(
+                    text: "\(url.standardized.path): several projects found; specify further: \(projectFiles)"
+                )
             case let .notFound(amongFilesInDirectory):
                 if amongFilesInDirectory {
                     printdiag(text: "\(url.standardized.path): no Xcode project found")

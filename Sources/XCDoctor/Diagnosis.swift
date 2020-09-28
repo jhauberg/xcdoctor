@@ -1,5 +1,5 @@
 //
-//  Diagnose.swift
+//  Diagnosis.swift
 //  xcdoctor
 //
 //  Created by Jacob Hauberg Hansen on 26/06/2020.

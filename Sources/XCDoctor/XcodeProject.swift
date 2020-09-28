@@ -80,6 +80,7 @@ struct ProductReference {
 
 public enum XcodeProjectError: Error, Equatable {
     case incompatible(reason: String)
+    case notSpecified(amongFiles: [String]) // filenames; not paths
     case notFound(amongFilesInDirectory: Bool) // param indicates whether directory was searched
 }
 
@@ -95,27 +96,38 @@ private struct XcodeProjectLocation {
 private func findProjectLocation(from url: URL) -> Result<XcodeProjectLocation, XcodeProjectError> {
     let xcodeprojUrl: URL
     if !FileManager.default.fileExists(atPath: url.standardized.path) {
+        // file must exist on disk
         return .failure(.notFound(amongFilesInDirectory: url.hasDirectoryPath))
     }
     if !url.isDirectory {
+        // file must be a directory (a file with .xcodeproj extension is not valid)
         return .failure(.incompatible(reason: "not an Xcode project"))
     }
     if url.pathExtension != "xcodeproj" {
-        let files = try! FileManager.default.contentsOfDirectory(
+        // file is a directory; but not specifically a project-file; look for a project here
+        let potentialProjectFiles = try! FileManager.default.contentsOfDirectory(
             atPath: url.standardized.path
-        )
-        if let xcodeProjectFile = files.first(where: { file -> Bool in
+        ).filter { file -> Bool in
+            // include any file ending with .xcodeproj
             file.hasSuffix("xcodeproj")
-        }) {
-            xcodeprojUrl = url.appendingPathComponent(xcodeProjectFile)
-        } else {
+        }
+        guard !potentialProjectFiles.isEmpty else {
+            // no matches
             return .failure(.notFound(amongFilesInDirectory: true))
         }
+        guard potentialProjectFiles.count == 1 else {
+            // more than one match; require more specificity
+            return .failure(.notSpecified(amongFiles: potentialProjectFiles))
+        }
+        // proceed with first (and only!) match
+        xcodeprojUrl = url.appendingPathComponent(potentialProjectFiles.first!)
     } else {
+        // file seems to be a valid .xcodeproj
         xcodeprojUrl = url
     }
     let pbxUrl = xcodeprojUrl.appendingPathComponent("project.pbxproj")
     if !FileManager.default.fileExists(atPath: pbxUrl.standardized.path) {
+        // project directory did not have the expected innards
         return .failure(.incompatible(reason: "unsupported Xcode project format"))
     }
     let directoryUrl = xcodeprojUrl // for example, ~/Development/My/Project.xcodeproj
@@ -241,10 +253,10 @@ private func fileReferences(
     var fileRefs: [FileReference] = []
     let groupObjects = objectsIdentifying(as: ["PBXGroup", "PBXVariantGroup"], among: objects)
     let buildFileReferences = objectsIdentifying(as: ["PBXBuildFile"], among: objects)
-        .compactMap{ object -> String? in
+        .compactMap { object -> String? in
             // TODO: note that linked frameworks appear with a "productRef" instead
             //       - do we want to handle these in some way?
-            return object.properties["fileRef"] as? String
+            object.properties["fileRef"] as? String
         }
 
     let excludedFileTypes = ["wrapper.xcdatamodel"]
