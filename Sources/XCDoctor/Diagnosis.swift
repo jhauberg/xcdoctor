@@ -258,7 +258,7 @@ private func assets(in project: XcodeProject) -> [Resource] {
     }
 }
 
-private final class SourcePatterns {
+private enum SourcePatterns {
     static let blockComments =
         try! NSRegularExpression(pattern:
             // note the #..# to designate a raw string, allowing the \* literal
