@@ -8,13 +8,13 @@ A command-line tool that helps diagnosing your Xcode project for common defects.
 
 <br />
 
-## Install
+## Installation
 
 | Dependency                                                              | Description                                   | Version | License            |
 | :---------------------------------------------------------------------- | :-------------------------------------------- | :------ | :----------------- |
-| [swift-argument-parser](https://github.com/apple/swift-argument-parser) | Describe and manage a command-line interface. | 0.3.0   | Apache License 2.0 |
+| [swift-argument-parser](https://github.com/apple/swift-argument-parser) | Describe and manage a command-line interface. | 0.4.1   | Apache License 2.0 |
 
-### Manually
+### Install manually
 
 **Requires Swift 5+**
 
@@ -31,7 +31,15 @@ $ cd .build/release
 $ cp -f xcdoctor /usr/local/bin/xcdoctor
 ```
 
-### Mint
+### Run without installation
+
+You can run `xcdoctor` without having to install it first:
+
+```shell
+$ swift run xcdoctor ~/path/to/my/Project.xcodeproj
+```
+
+### Install using Mint
 
 ```shell
 $ mint install jhauberg/xcdoctor
@@ -39,11 +47,12 @@ $ mint install jhauberg/xcdoctor
 
 ## Usage
 
-If `xcdoctor` was installed as expected, you can now run `xcdoctor`:
+If `xcdoctor` was installed as expected, you can then run `xcdoctor` from anywhere:
 
 ```shell
 $ xcdoctor --help
 ```
+
 ```console
 USAGE: xcdoctor <xcodeproj> [--verbose]
 
@@ -60,13 +69,15 @@ OPTIONS:
   --version               Show the version.
 ```
 
-At this point, you can now run `xcdoctor` and point it directly to your Xcode project to initiate an [examination](#examination):
+At this point, you can direct `xcdoctor` to your Xcode project to initiate an [examination](#examination):
 
 ```shell
 $ xcdoctor ~/path/to/my/Project.xcodeproj
 ```
 
-*Add the `--verbose` option to see an indication of progress during examination.*
+*Add the `--verbose` flag to see an indication of progress during examination.*
+
+Note that `xcdoctor` is _only_ able to examine [`.xcodeproj`](http://www.monobjc.net/xcode-project-file-format.html) files. If your project is based on Swift Package Manager (like `xcdoctor` itself), you can generate an `.xcodeproj` using `swift package generate-xcodeproj`.
 
 # Examination
 
@@ -80,7 +91,9 @@ This process includes resolving and validating file/group references, determinin
 
 If, during an [examination](#examination), a defect is discovered, `xcdoctor` will form a diagnosis for each defect, including advice on how to treat it.
 
-The diagnoses are reported in _reverse order of importance_, such that the last diagnosis is more important than the first. This is important to note, as treating one defect could have a cascading effect on other diagnoses (sometimes even solving them).
+The diagnoses are reported in _reverse order of significance_, such that the last reported diagnosis is more important than the first.
+
+Diagnoses should be handled in this order, starting with the last reported one. Treating a significant defect could have a cascading effect on less significant diagnoses (sometimes even treating them completely).
 
 <br />
 
