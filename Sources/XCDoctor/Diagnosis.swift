@@ -420,7 +420,7 @@ public func examine(
             {
                 patterns.append(SourcePatterns.htmlComments)
             } else if source.kind == "text.plist.xml" || source.url.pathExtension == "plist",
-                project.referencesPropertyListAsInfoPlist(named: source)
+                      project.referencesPropertyListAsInfoPlist(named: source)
             {
                 patterns.append(SourcePatterns.appFonts)
             }

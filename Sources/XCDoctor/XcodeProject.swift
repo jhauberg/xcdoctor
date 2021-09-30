@@ -60,7 +60,7 @@ struct FileReference {
     }
 
     var isSourceFile: Bool {
-        sourceTypes.contains { (fileType, extensions) -> Bool in
+        sourceTypes.contains { fileType, extensions -> Bool in
             kind == fileType || extensions.contains(url.pathExtension)
         }
     }
@@ -175,7 +175,7 @@ private func resolveFileURL(
     fromProjectLocation location: XcodeProjectLocation
 ) -> URL? {
     guard let sourceTree = object.properties["sourceTree"] as? String,
-        var path = object.properties["path"] as? String
+          var path = object.properties["path"] as? String
     else {
         return nil
     }
@@ -312,7 +312,7 @@ private func groupReferences(
     let groupObjects = objectsIdentifying(as: ["PBXGroup", "PBXVariantGroup"], among: objects)
     for group in groupObjects {
         guard let children = group.properties["children"] as? [String],
-            let projectUrl = resolveProjectURL(object: group, groups: groupObjects)
+              let projectUrl = resolveProjectURL(object: group, groups: groupObjects)
         else {
             continue
         }
