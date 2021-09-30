@@ -1,6 +1,6 @@
 # format options
 
---swiftversion 5.2
+--swiftversion 5.5
 --maxwidth 100
 
 # file options
