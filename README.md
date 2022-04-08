@@ -12,7 +12,7 @@ A command-line tool that helps diagnosing your Xcode project for common defects.
 
 | Dependency                                                              | Description                                   | Version | License            |
 | :---------------------------------------------------------------------- | :-------------------------------------------- | :------ | :----------------- |
-| [swift-argument-parser](https://github.com/apple/swift-argument-parser) | Describe and manage a command-line interface. | 0.4.1   | Apache License 2.0 |
+| [swift-argument-parser](https://github.com/apple/swift-argument-parser) | Describe and manage a command-line interface. | 1.1.1   | Apache License 2.0 |
 
 ### Install manually
 
