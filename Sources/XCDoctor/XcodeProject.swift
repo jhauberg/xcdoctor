@@ -278,7 +278,7 @@ private func fileReferences(
             continue
         }
 
-        var isReferencedAsBuildFile: Bool = false
+        var isReferencedAsBuildFile = false
         if buildFileReferences.contains(file.id) {
             // file is directly referenced as a build file
             isReferencedAsBuildFile = true
