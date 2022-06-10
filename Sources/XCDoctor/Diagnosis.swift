@@ -29,8 +29,18 @@ public enum Defect {
      A condition that applies if any non-source-file (including resources in assetcatalogs)
      does not appear to be used in any source-file.
 
-     Whether or not a resource is deemed to be in use relies on simple pattern matching
-     and is prone to both false-positives and missed cases.
+     Whether or not a resource is deemed to be in use relies on simple full-text pattern matching
+     and is prone to both false-positives and false-negatives.
+
+     Some cases require more context to resolve, and is beyond the scope of this examination.
+
+     For example, a case where a string represents both a piece of text, but _also_ a resource,
+     will deem the resource to be in use just by the existence of the text string. To properly
+     resolve this, one would need to know more context; is this string used as a piece of text,
+     or is it a reference to something else?
+
+     Similarly, a case where a resource reference is assembled at run-time could trigger a
+     false-positive that this resource is not used because it does not literally appear verbatim.
      */
     case unusedResources
     /**
