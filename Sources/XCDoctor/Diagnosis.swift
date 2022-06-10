@@ -331,6 +331,7 @@ public func examine(
     for defect: Defect,
     progress: ExaminationProgressCallback? = nil
 ) -> Diagnosis? {
+    // TODO: why not show progress for basically every case?
     switch defect {
     case .nonExistentFiles:
         let filePaths = nonExistentFilePaths(in: project)
@@ -523,8 +524,10 @@ public func examine(
                 detect all usage patterns with certainty. Proceed with caution.
                 """,
                 cases: res.map { resource -> String in
-                    // prefer name including extension, as this can help distinguish
-                    // between asset catalog resources and plain resources not catalogued
+                    // TODO: resources always have filenames now; so we no longer have an easy
+                    //       way of distinguishing between container/catalog resources by name-
+                    //       maybe this is ok? i.e. previous "resource" is now "resource.imageset"
+                    //       the latter is tied to filesystem, while the former is obvious inside Xcode
                     resource.fileName ?? resource.name
                 }
             )
