@@ -27,8 +27,10 @@ func printdiag(text: String, kind: Diagnostic = .information) {
             break // no color
         case .important:
             diagnostic = "\u{1B}[0;31m\(diagnostic)\u{1B}[0m"
-        case .note:
+        case .result:
             diagnostic = "\u{1B}[0;33m\(diagnostic)\u{1B}[0m"
+        case .note:
+            break // no color
         }
     }
     print(diagnostic, to: &outputStream)
@@ -152,12 +154,12 @@ struct Doctor: ParsableCommand {
             ) {
                 if let references = diagnosis.cases?.sorted() {
                     for reference in references {
-                        printdiag(text: reference, kind: .note)
+                        printdiag(text: reference, kind: .result)
                     }
                 }
                 printdiag(text: diagnosis.conclusion, kind: .important)
                 if let supplemental = diagnosis.help {
-                    printdiag(text: supplemental)
+                    printdiag(text: supplemental, kind: .note)
                 }
             }
         }

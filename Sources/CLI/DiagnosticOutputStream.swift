@@ -11,6 +11,7 @@ import Foundation
 enum Diagnostic {
     case important
     case information
+    case result
     case note
 
     var stream: FileHandle {
@@ -18,6 +19,8 @@ enum Diagnostic {
         case .information:
             return .standardError
         case .important:
+            return .standardOutput
+        case .result:
             return .standardOutput
         case .note:
             return .standardOutput
