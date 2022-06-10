@@ -7,36 +7,56 @@
 //
 
 import Foundation
+
+import ArgumentParser
 import XCDoctor
 
 var outputStream = DiagnosticOutputStream()
 
+extension String {
+    func capitalizingFirstLetter() -> String {
+        return prefix(1).capitalized + dropFirst()
+    }
+}
+
 func printdiag(text: String, kind: Diagnostic = .information) {
+    // TODO: this validation only applies when actually output;
+    //       consider applying these earlier; i.e. when initializating a diagnosis?
+    switch kind {
+    case .information:
+        break // no rules
+    case .important:
+        assert(!text.hasSuffix("."), "Important diagnostics should not end with a period.")
+        assert(text.lowercased() == text, "Important diagnostics should always be lowercase.")
+    case .result:
+        assert(!text.contains("\n"), "Result diagnostics should not contain newlines.")
+    case .note:
+        assert(text.capitalizingFirstLetter() == text, "Note diagnostics should be capitalized.")
+        assert(text.hasSuffix("."), "Note diagnostics should end with a period.")
+    }
+
     outputStream.kind = kind
-    // TODO: some debug validation of diagnostic messages; e.g.
-    //         .important   should not be capitalized, and should not end with period
-    //         .information should be capitalized and end with period
+
     let prefix = "doctor:"
     var diagnostic: String = text
     if kind == .important {
         diagnostic = "\(prefix) \(diagnostic)"
     }
+
     if outputStream.supportsColor {
         switch kind {
-        case .information:
+        case .information,
+             .note:
             break // no color
         case .important:
             diagnostic = "\u{1B}[0;31m\(diagnostic)\u{1B}[0m"
         case .result:
             diagnostic = "\u{1B}[0;33m\(diagnostic)\u{1B}[0m"
-        case .note:
-            break // no color
         }
     }
+
     print(diagnostic, to: &outputStream)
 }
-
-import ArgumentParser
 
 struct Doctor: ParsableCommand {
     static var configuration = CommandConfiguration(
