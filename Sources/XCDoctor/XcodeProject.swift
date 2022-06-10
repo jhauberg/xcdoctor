@@ -388,8 +388,11 @@ private func productReferences(among objects: [PBXObject]) -> [ProductReference]
     return productRefs
 }
 
+// intentionally `final class` instead of struct as we will be passing it around a bunch;
+// so it's preferable to just send a reference around rather than an entire copy
 public final class XcodeProject {
     public typealias EventCallback = (String) -> Void
+
     /**
      Attempts to locate and evaluate an Xcode project at a given URL.
 

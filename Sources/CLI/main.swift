@@ -185,7 +185,8 @@ struct Doctor: ParsableCommand {
                     // note ESC 8, not CSI u - this is compatible with Terminal.app
                     // note that this does not work correctly if output causes display to scroll
                     let position = "\u{1B}8\u{1B}[1A\u{1B}[K"
-
+                    // TODO: note that this breaks pretty badly if there's not enough columns;
+                    //       consider checking terminal width or otherwise constrict output?
                     printdiag(text: "\(position)\(message)")
                 } : nil
 
