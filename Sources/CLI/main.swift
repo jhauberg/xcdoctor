@@ -54,6 +54,16 @@ struct Doctor: ParsableCommand {
         """)
     var xcodeproj: String
 
+    // one might want to keep commented code, as it may some day be put in again-
+    // if it has not been removed, it is likely that it remains for a reason
+    // but this is an optional choice; prefer stripping unless otherwise specified
+    @Flag(name: .long,
+          help:
+          """
+          Don't strip comments from source files (block, line and xml comments).
+          """)
+    var keepComments: Bool = false
+
     @Flag(name: .shortAndLong,
           help:
           """
@@ -111,7 +121,7 @@ struct Doctor: ParsableCommand {
         // so, for example, nonExistentFiles should be cleared before danglingFiles,
         // as that likely has a cascading effect throughout previous diagnoses
         let conditions: [Defect] = [
-            .unusedResources,
+            .unusedResources(strippingSourceComments: !keepComments),
             .emptyGroups,
             .danglingFiles,
             .emptyTargets,

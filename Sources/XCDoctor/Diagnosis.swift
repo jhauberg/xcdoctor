@@ -42,7 +42,7 @@ public enum Defect {
      Similarly, a case where a resource reference is assembled at run-time could trigger a
      false-positive that this resource is not used because it does not literally appear verbatim.
      */
-    case unusedResources
+    case unusedResources(strippingSourceComments: Bool)
     /**
      A condition that applies if any groups (including non-folder groups) resolves to
      a path that does not exist on disk.
@@ -422,7 +422,7 @@ public func examine(
                 cases: filePaths
             )
         }
-    case .unusedResources:
+    case .unusedResources(let strippingComments):
         var res = resources(in: project) + assets(in: project)
         // find special cases, e.g. AppIcon
         res.removeAll { resource -> Bool in
@@ -453,10 +453,12 @@ public func examine(
 
             var patterns: [NSRegularExpression] = []
             if let kind = source.kind, kind.starts(with: "sourcecode") {
-                patterns.append(contentsOf: [
-                    // note prioritized order: strip block comments before line comments
-                    SourcePatterns.blockComments, SourcePatterns.lineComments,
-                ])
+                if strippingComments {
+                    patterns.append(contentsOf: [
+                        // note prioritized order: strip block comments before line comments
+                        SourcePatterns.blockComments, SourcePatterns.lineComments,
+                    ])
+                }
             } else if source.kind == "text.xml" || source.kind == "text.html" ||
                 source.url.pathExtension == "xml" || source.url.pathExtension == "html"
             {
