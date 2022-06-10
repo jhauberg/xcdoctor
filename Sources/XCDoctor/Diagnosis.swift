@@ -84,9 +84,10 @@ private func nonExistentFiles(in project: XcodeProject) -> [FileReference] {
 }
 
 private func nonExistentFilePaths(in project: XcodeProject) -> [String] {
-    nonExistentFiles(in: project).map { ref -> String in
-        ref.path
-    }
+    nonExistentFiles(in: project)
+        .map { ref -> String in
+            ref.path
+        }
 }
 
 func nonExistentGroups(in project: XcodeProject) -> [GroupReference] {
@@ -99,9 +100,10 @@ func nonExistentGroups(in project: XcodeProject) -> [GroupReference] {
 }
 
 private func nonExistentGroupPaths(in project: XcodeProject) -> [String] {
-    nonExistentGroups(in: project).map { ref -> String in
-        "\(ref.path!): \"\(ref.projectUrl.absoluteString)\""
-    }
+    nonExistentGroups(in: project)
+        .map { ref -> String in
+            "\(ref.path!): \"\(ref.projectUrl.absoluteString)\""
+        }
 }
 
 private func emptyGroups(in project: XcodeProject) -> [GroupReference] {
@@ -111,17 +113,20 @@ private func emptyGroups(in project: XcodeProject) -> [GroupReference] {
 }
 
 private func emptyGroupPaths(in project: XcodeProject) -> [String] {
-    emptyGroups(in: project).map { ref -> String in
-        "\(ref.projectUrl.absoluteString)"
-    }
+    emptyGroups(in: project)
+        .map { ref -> String in
+            "\(ref.projectUrl.absoluteString)"
+        }
 }
 
 private func emptyTargetNames(in project: XcodeProject) -> [String] {
-    project.products.filter { ref -> Bool in
-        !ref.buildsSourceFiles
-    }.map { product -> String in
-        product.name
-    }
+    project.products
+        .filter { ref -> Bool in
+            !ref.buildsSourceFiles
+        }
+        .map { product -> String in
+            product.name
+        }
 }
 
 private func propertyListReferences(in project: XcodeProject) -> [FileReference] {
@@ -131,32 +136,35 @@ private func propertyListReferences(in project: XcodeProject) -> [FileReference]
 }
 
 private func danglingFilePaths(in project: XcodeProject) -> [String] {
-    project.files.filter { ref -> Bool in
-        !ref.isHeaderFile && ref.isSourceFile && !ref.hasTargetMembership
-    }.filter { ref -> Bool in
-        // handle the special-case Info.plist
-        if ref.kind == "text.plist.xml" || ref.url.pathExtension == "plist" {
-            return !project.referencesPropertyListAsInfoPlist(named: ref)
+    project.files
+        .filter { ref -> Bool in
+            !ref.isHeaderFile && ref.isSourceFile && !ref.hasTargetMembership
         }
-        return true
-    }.map { ref -> String in
-        ref.path
-    }
+        .filter { ref -> Bool in
+            // handle the special-case Info.plist
+            if ref.kind == "text.plist.xml" || ref.url.pathExtension == "plist" {
+                return !project.referencesPropertyListAsInfoPlist(named: ref)
+            }
+            return true
+        }
+        .map { ref -> String in
+            ref.path
+        }
 }
 
 private func sourceFiles(in project: XcodeProject) -> [FileReference] {
     let exceptFiles = nonExistentFiles(in: project)
     return project.files.filter { ref -> Bool in
-        ref.isSourceFile && // file is compiled in one way or another
-            !ref.url.isDirectory && // file is text-based; i.e. not a directory
-            !exceptFiles.contains(where: { otherRef -> Bool in // file exists
+        ref.isSourceFile  // file is compiled in one way or another
+            && !ref.url.isDirectory  // file is text-based; i.e. not a directory
+            && !exceptFiles.contains(where: { otherRef -> Bool in  // file exists
                 ref.url == otherRef.url
             })
     }
 }
 
-private extension String {
-    var removingScaleFactors: String {
+extension String {
+    fileprivate var removingScaleFactors: String {
         replacingOccurrences(of: "@1x", with: "")
             .replacingOccurrences(of: "@2x", with: "")
             .replacingOccurrences(of: "@3x", with: "")
@@ -165,8 +173,9 @@ private extension String {
 
 private func fontFamilyVariants(from url: URL) -> [String] {
     guard let data = NSData(contentsOf: url),
-            let provider = CGDataProvider(data: data),
-            let font = CGFont(provider) else {
+        let provider = CGDataProvider(data: data),
+        let font = CGFont(provider)
+    else {
         return []
     }
     var variants: [String] = []
@@ -195,7 +204,7 @@ private struct Resource {
             name,
             name.removingScaleFactors,
             fileName,
-            fileName.removingScaleFactors
+            fileName.removingScaleFactors,
         ]
 
         if url.pathExtension == "ttf" || url.pathExtension == "otf" {
@@ -205,48 +214,53 @@ private struct Resource {
         }
 
         nameVariants = Array(
-            Set(names) // remove any potential duplicates
+            Set(names)  // remove any potential duplicates
         )
     }
 }
 
 private func resources(in project: XcodeProject) -> [Resource] {
-    let sources = sourceFiles(in: project).filter { ref -> Bool in
-        // exclude xml/html files as sources; consider them both source and resource
-        // TODO: this is a bit of a slippery slope; where do we draw the line?
-        //       stuff like JSON and YAML probably fits here as well, etc. etc. ...
-        ref.kind != "text.xml" && ref.url.pathExtension != "xml" &&
-            ref.kind != "text.html" && ref.url.pathExtension != "html"
-    }
-    return project.files.filter { ref -> Bool in
-        // TODO: specific exclusions? e.g. "archive.ar"/"a", ".whatever" etc
-        ref.hasTargetMembership &&
-            ref.kind != "folder.assetcatalog" && // not an assetcatalog
-            ref.url.pathExtension != "xcassets" && // not an assetcatalog
-            ref.kind != "wrapper.framework" && // not a dynamic framework
-            ref.url.pathExtension != "a" && // not a static library
-            ref.url.pathExtension != "xcconfig" && // not xcconfig
-            !ref.url.lastPathComponent.hasPrefix(".") && // not a hidden file
-            !sources.contains { sourceRef -> Bool in // not a source-file
-                ref.url == sourceRef.url
-            }
-    }.map { ref -> Resource in
-        Resource(at: ref.url)
-    }
+    let sources = sourceFiles(in: project)
+        .filter { ref -> Bool in
+            // exclude xml/html files as sources; consider them both source and resource
+            // TODO: this is a bit of a slippery slope; where do we draw the line?
+            //       stuff like JSON and YAML probably fits here as well, etc. etc. ...
+            ref.kind != "text.xml" && ref.url.pathExtension != "xml" && ref.kind != "text.html"
+                && ref.url.pathExtension != "html"
+        }
+    return project.files
+        .filter { ref -> Bool in
+            // TODO: specific exclusions? e.g. "archive.ar"/"a", ".whatever" etc
+            ref.hasTargetMembership && ref.kind != "folder.assetcatalog"  // not an assetcatalog
+                && ref.url.pathExtension != "xcassets"  // not an assetcatalog
+                && ref.kind != "wrapper.framework"  // not a dynamic framework
+                && ref.url.pathExtension != "a"  // not a static library
+                && ref.url.pathExtension != "xcconfig"  // not xcconfig
+                && !ref.url.lastPathComponent.hasPrefix(".")  // not a hidden file
+                && !sources.contains { sourceRef -> Bool in
+                    ref.url == sourceRef.url  // not a source-file
+                }
+        }
+        .map { ref -> Resource in
+            Resource(at: ref.url)
+        }
 }
 
-private extension URL {
+extension URL {
     /**
      Return true if the url points to a directory containing a `Contents.json` file.
      */
-    var isAssetURL: Bool {
-        FileManager.default.fileExists(atPath:
-            appendingPathComponent("Contents.json").path)
+    fileprivate var isAssetURL: Bool {
+        FileManager.default.fileExists(
+            atPath: appendingPathComponent("Contents.json").path
+        )
     }
 }
 
-private extension String {
-    func removingOccurrences(matchingExpressions expressions: [NSRegularExpression]) -> String {
+extension String {
+    fileprivate func removingOccurrences(matchingExpressions expressions: [NSRegularExpression])
+        -> String
+    {
         var str = self
         for expr in expressions {
             var match = expr.firstMatch(
@@ -266,59 +280,70 @@ private extension String {
 }
 
 private func assetURLs(at url: URL) -> [URL] {
-    guard let dirEnumerator = FileManager.default.enumerator(
-        at: url,
-        includingPropertiesForKeys: [.isDirectoryKey]
-    ) else {
+    guard
+        let dirEnumerator = FileManager.default.enumerator(
+            at: url,
+            includingPropertiesForKeys: [.isDirectoryKey]
+        )
+    else {
         return []
     }
 
-    return dirEnumerator.map { item -> URL in
-        item as! URL
-    }.filter { url -> Bool in
-        url.isDirectory && url.isAssetURL && !url.pathExtension.isEmpty
-    }
+    return
+        dirEnumerator.map { item -> URL in
+            item as! URL
+        }
+        .filter { url -> Bool in
+            url.isDirectory && url.isAssetURL && !url.pathExtension.isEmpty
+        }
 }
 
 private func assets(in project: XcodeProject) -> [Resource] {
-    project.files.filter { ref -> Bool in
-        ref.kind == "folder.assetcatalog" || ref.url.pathExtension == "xcassets"
-    }.flatMap { ref -> [Resource] in
-        assetURLs(at: ref.url).map { assetUrl -> Resource in
-            Resource(at: assetUrl)
+    project.files
+        .filter { ref -> Bool in
+            ref.kind == "folder.assetcatalog" || ref.url.pathExtension == "xcassets"
         }
-    }
+        .flatMap { ref -> [Resource] in
+            assetURLs(at: ref.url)
+                .map { assetUrl -> Resource in
+                    Resource(at: assetUrl)
+                }
+        }
 }
 
 private enum SourcePatterns {
     static let blockComments =
-        try! NSRegularExpression(pattern:
-            // note the #..# to designate a raw string, allowing the \* literal
-             #"/\*"# + // starting point of a block comment
-             ".*?" + // anything between, lazily
-             #"\*/"#, // ending point of a block comment
-             options: [.dotMatchesLineSeparators]
+        try! NSRegularExpression(
+            pattern:
+                // note the #..# to designate a raw string, allowing the \* literal
+                #"/\*"#  // starting point of a block comment
+                + ".*?"  // anything between, lazily
+                + #"\*/"#,  // ending point of a block comment
+            options: [.dotMatchesLineSeparators]
         )
     static let lineComments =
-        try! NSRegularExpression(pattern:
-            "(?<!:)" +  // avoid any case where the previous character is ":" (i.e. skipping URLs)
-            "//" + // starting point of a single-line comment
-            "[^\n\r]*?" + // anything following that is not a newline
-            "(?:[\n\r]|$)", // until reaching end of string or a newline
+        try! NSRegularExpression(
+            pattern:
+                "(?<!:)"  // avoid any case where the previous character is ":" (i.e. skipping URLs)
+                + "//"  // starting point of a single-line comment
+                + "[^\n\r]*?"  // anything following that is not a newline
+                + "(?:[\n\r]|$)",  // until reaching end of string or a newline
             options: [.anchorsMatchLines]
         )
     static let htmlComments =
-        try! NSRegularExpression(pattern:
-            // strip HTML/XML comments
-            "<!--.+?-->",
+        try! NSRegularExpression(
+            pattern:
+                // strip HTML/XML comments
+                "<!--.+?-->",
             options: [.dotMatchesLineSeparators]
         )
     static let appFonts =
-        try! NSRegularExpression(pattern:
-            // strip this particular and iOS specific plist-entry;
-            // the reasoning is that these font resources should not be considered "in-use"
-            // just by being defined in this plist entry- only if they also appear elsewhere
-            "<key>UIAppFonts</key>.+?</array>",
+        try! NSRegularExpression(
+            pattern:
+                // strip this particular and iOS specific plist-entry;
+                // the reasoning is that these font resources should not be considered "in-use"
+                // just by being defined in this plist entry- only if they also appear elsewhere
+                "<key>UIAppFonts</key>.+?</array>",
             options: [.dotMatchesLineSeparators]
         )
 }
@@ -339,9 +364,9 @@ public func examine(
             return Diagnosis(
                 conclusion: "non-existent files",
                 help: """
-                These files are not present on the file system and could have been moved or removed.
-                In either case, each reference should be resolved or removed from the project.
-                """,
+                    These files are not present on the file system and could have been moved or removed.
+                    In either case, each reference should be resolved or removed from the project.
+                    """,
                 cases: filePaths
             )
         }
@@ -364,9 +389,9 @@ public func examine(
                 //       overriding the incorrect path by using SOURCE_ROOT or similar
                 //       so ultimately everything works fine in Xcode, even though there is a bad path
                 help: """
-                If not corrected, these paths can cause tools to erroneously
-                map children of each group to non-existent files.
-                """,
+                    If not corrected, these paths can cause tools to erroneously
+                    map children of each group to non-existent files.
+                    """,
                 cases: dirPaths
             )
         }
@@ -406,8 +431,8 @@ public func examine(
             return Diagnosis(
                 conclusion: "corrupted plists",
                 help: """
-                These files must be fixed manually using any plain-text editor.
-                """,
+                    These files must be fixed manually using any plain-text editor.
+                    """,
                 cases: corruptedFilePaths
             )
         }
@@ -417,9 +442,9 @@ public func examine(
             return Diagnosis(
                 conclusion: "files not included in any target",
                 help: """
-                These files are never being compiled and might not be used;
-                consider whether they should be removed.
-                """,
+                    These files are never being compiled and might not be used;
+                    consider whether they should be removed.
+                    """,
                 cases: filePaths
             )
         }
@@ -460,17 +485,18 @@ public func examine(
                         SourcePatterns.blockComments, SourcePatterns.lineComments,
                     ])
                 }
-            } else if source.kind == "text.xml" || source.kind == "text.html" ||
-                source.url.pathExtension == "xml" || source.url.pathExtension == "html"
+            } else if source.kind == "text.xml" || source.kind == "text.html"
+                || source.url.pathExtension == "xml" || source.url.pathExtension == "html"
             {
                 patterns.append(SourcePatterns.htmlComments)
             } else if source.kind == "text.plist.xml" || source.url.pathExtension == "plist",
-                      project.referencesPropertyListAsInfoPlist(named: source)
+                project.referencesPropertyListAsInfoPlist(named: source)
             {
                 patterns.append(SourcePatterns.appFonts)
             }
 
-            let strippedFileContents = fileContents
+            let strippedFileContents =
+                fileContents
                 .removingOccurrences(matchingExpressions: patterns)
 
             res.removeAll { resource -> Bool in
@@ -489,8 +515,7 @@ public func examine(
                         // still being decently specific; e.g.
                         //      `/monster.png"`
                         searchStrings = ["\"\(resourceName)\"", "/\(resourceName)\""]
-                    } else if source.kind == "text.plist.xml" ||
-                        source.url.pathExtension == "plist"
+                    } else if source.kind == "text.plist.xml" || source.url.pathExtension == "plist"
                     {
                         // search property-lists; typically only node contents
                         // e.g. "<key>Icon10</key>"
@@ -519,10 +544,10 @@ public func examine(
             return Diagnosis(
                 conclusion: "unused resources",
                 help: """
-                These files might not be used; consider whether they should be removed.
-                Note that this diagnosis is prone to false-positives as it can't realistically
-                detect all usage patterns with certainty. Proceed with caution.
-                """,
+                    These files might not be used; consider whether they should be removed.
+                    Note that this diagnosis is prone to false-positives as it can't realistically
+                    detect all usage patterns with certainty. Proceed with caution.
+                    """,
                 cases: res.map { resource -> String in
                     // TODO: resources always have filenames now; so we no longer have an easy
                     //       way of distinguishing between container/catalog resources by name-
@@ -538,9 +563,9 @@ public func examine(
             return Diagnosis(
                 conclusion: "empty groups",
                 help: """
-                These groups contain zero children and might be redundant;
-                consider whether they should be removed.
-                """,
+                    These groups contain zero children and might be redundant;
+                    consider whether they should be removed.
+                    """,
                 cases: groupPaths
             )
         }
@@ -550,9 +575,9 @@ public func examine(
             return Diagnosis(
                 conclusion: "empty targets",
                 help: """
-                These targets do not compile any sources and might be redundant;
-                consider whether they should be removed.
-                """,
+                    These targets do not compile any sources and might be redundant;
+                    consider whether they should be removed.
+                    """,
                 cases: targetNames
             )
         }

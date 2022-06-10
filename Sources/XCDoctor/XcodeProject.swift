@@ -40,7 +40,7 @@ private struct PBXObject {
 
 struct GroupReference {
     let url: URL?
-    let projectUrl: URL // TODO: naming, this is the visual tree as seen in Xcode
+    let projectUrl: URL  // TODO: naming, this is the visual tree as seen in Xcode
     let name: String
     let hasChildren: Bool
 
@@ -80,15 +80,15 @@ struct ProductReference {
 
 public enum XcodeProjectError: Error, Equatable {
     case incompatible(reason: String)
-    case notSpecified(amongFiles: [String]) // filenames; not paths
-    case notFound(amongFilesInDirectory: Bool) // param indicates whether directory was searched
+    case notSpecified(amongFiles: [String])  // filenames; not paths
+    case notFound(amongFilesInDirectory: Bool)  // param indicates whether directory was searched
 }
 
 private struct XcodeProjectLocation {
-    let root: URL // directory containing .xcodeproj
-    let xcodeproj: URL // path to .xcodeproj
-    let pbx: URL // path to .xcodeproj/project.pbxproj
-    var name: String { // MyProject.xcodeproj
+    let root: URL  // directory containing .xcodeproj
+    let xcodeproj: URL  // path to .xcodeproj
+    let pbx: URL  // path to .xcodeproj/project.pbxproj
+    var name: String {  // MyProject.xcodeproj
         xcodeproj.lastPathComponent
     }
 }
@@ -105,12 +105,14 @@ private func findProjectLocation(from url: URL) -> Result<XcodeProjectLocation, 
     }
     if url.pathExtension != "xcodeproj" {
         // file is a directory; but not specifically a project-file; look for a project here
-        let potentialProjectFiles = try! FileManager.default.contentsOfDirectory(
-            atPath: url.standardized.path
-        ).filter { file -> Bool in
-            // include any file ending with .xcodeproj
-            file.hasSuffix("xcodeproj")
-        }
+        let potentialProjectFiles = try! FileManager.default
+            .contentsOfDirectory(
+                atPath: url.standardized.path
+            )
+            .filter { file -> Bool in
+                // include any file ending with .xcodeproj
+                file.hasSuffix("xcodeproj")
+            }
         guard !potentialProjectFiles.isEmpty else {
             // no matches
             return .failure(.notFound(amongFilesInDirectory: true))
@@ -130,13 +132,16 @@ private func findProjectLocation(from url: URL) -> Result<XcodeProjectLocation, 
         // project directory did not have the expected innards
         return .failure(.incompatible(reason: "unsupported Xcode project format"))
     }
-    let directoryUrl = xcodeprojUrl // for example, ~/Development/My/Project.xcodeproj
-        .deletingLastPathComponent() //             ~/Development/My/
-    return .success(XcodeProjectLocation(
-        root: directoryUrl,
-        xcodeproj: xcodeprojUrl,
-        pbx: pbxUrl
-    ))
+    let directoryUrl =
+        xcodeprojUrl  // for example, ~/Development/My/Project.xcodeproj
+        .deletingLastPathComponent()  // ~/Development/My/
+    return .success(
+        XcodeProjectLocation(
+            root: directoryUrl,
+            xcodeproj: xcodeprojUrl,
+            pbx: pbxUrl
+        )
+    )
 }
 
 private func parent(of object: PBXObject, in groups: [PBXObject]) -> PBXObject? {
@@ -145,19 +150,23 @@ private func parent(of object: PBXObject, in groups: [PBXObject]) -> PBXObject? 
             return children.contains(object.id)
         }
         return false
-    }.first
+    }
+    .first
 }
 
 private func resolveProjectURL(object: PBXObject, groups: [PBXObject]) -> URL? {
-    guard var path = object.properties["name"] as? String ?? object
-        .properties["path"] as? String
+    guard
+        var path = object.properties["name"] as? String
+            ?? object
+            .properties["path"] as? String
     else {
         return nil
     }
 
     var ref = object
     while let parent = parent(of: ref, in: groups) {
-        if let parentPath = parent.properties["name"] as? String ?? parent
+        if let parentPath = parent.properties["name"] as? String
+            ?? parent
             .properties["path"] as? String,
             !parentPath.isEmpty
         {
@@ -175,7 +184,7 @@ private func resolveFileURL(
     fromProjectLocation location: XcodeProjectLocation
 ) -> URL? {
     guard let sourceTree = object.properties["sourceTree"] as? String,
-          var path = object.properties["path"] as? String
+        var path = object.properties["path"] as? String
     else {
         return nil
     }
@@ -235,9 +244,10 @@ private func objectReferences(in objectGraph: [String: Any]) -> [PBXObject] {
     }
 }
 
-private func objectsIdentifying(as identities: [String],
-                                among objects: [PBXObject]) -> [PBXObject]
-{
+private func objectsIdentifying(
+    as identities: [String],
+    among objects: [PBXObject]
+) -> [PBXObject] {
     objects.filter { object -> Bool in
         if let identity = object.properties["isa"] as? String {
             return identities.contains(identity)
@@ -270,11 +280,13 @@ private func fileReferences(
             continue
         }
 
-        guard let fileUrl = resolveFileURL(
-            object: file,
-            groups: groupObjects,
-            fromProjectLocation: location
-        ) else {
+        guard
+            let fileUrl = resolveFileURL(
+                object: file,
+                groups: groupObjects,
+                fromProjectLocation: location
+            )
+        else {
             continue
         }
 
@@ -312,12 +324,11 @@ private func groupReferences(
     let groupObjects = objectsIdentifying(as: ["PBXGroup", "PBXVariantGroup"], among: objects)
     for group in groupObjects {
         guard let children = group.properties["children"] as? [String],
-              let projectUrl = resolveProjectURL(object: group, groups: groupObjects)
+            let projectUrl = resolveProjectURL(object: group, groups: groupObjects)
         else {
             continue
         }
-        guard let name = group.properties["name"] as? String ??
-            group.properties["path"] as? String
+        guard let name = group.properties["name"] as? String ?? group.properties["path"] as? String
         else {
             continue
         }
@@ -345,16 +356,18 @@ private func productReferences(among objects: [PBXObject]) -> [ProductReference]
             continue
         }
         var compilesAnySource =
-            false // false until we determine any compilation phase of at least one source file
+            false  // false until we determine any compilation phase of at least one source file
         if let phases = target.properties["buildPhases"] as? [String] {
-            let compilationPhases = objects.filter { object -> Bool in
-                phases.contains(object.id)
-            }.filter { phase -> Bool in
-                if let isa = phase.properties["isa"] as? String {
-                    return isa == "PBXSourcesBuildPhase"
+            let compilationPhases =
+                objects.filter { object -> Bool in
+                    phases.contains(object.id)
                 }
-                return false
-            }
+                .filter { phase -> Bool in
+                    if let isa = phase.properties["isa"] as? String {
+                        return isa == "PBXSourcesBuildPhase"
+                    }
+                    return false
+                }
             if !compilationPhases.isEmpty {
                 for phase in compilationPhases {
                     if let sources = phase.properties["files"] as? [String], !sources.isEmpty {
@@ -400,11 +413,13 @@ public final class XcodeProject {
         beforeOpeningProject?(projectLocation.name)
         do {
             var format = PropertyListSerialization.PropertyListFormat.openStep
-            guard let plist = try PropertyListSerialization.propertyList(
-                from: try Data(contentsOf: projectLocation.pbx),
-                options: .mutableContainersAndLeaves,
-                format: &format
-            ) as? [String: Any] else {
+            guard
+                let plist = try PropertyListSerialization.propertyList(
+                    from: try Data(contentsOf: projectLocation.pbx),
+                    options: .mutableContainersAndLeaves,
+                    format: &format
+                ) as? [String: Any]
+            else {
                 return .failure(.incompatible(reason: "unsupported Xcode project format"))
             }
             beforeEvaluatingProject?(projectLocation.name)
@@ -454,7 +469,8 @@ public final class XcodeProject {
             if let settings = object.properties["buildSettings"] as? [String: Any] {
                 if let infoPlistSetting = settings["INFOPLIST_FILE"] as? String {
                     let setting = infoPlistSetting.replacingOccurrences(
-                        of: "$(SRCROOT)", with: location.root.standardized.path
+                        of: "$(SRCROOT)",
+                        with: location.root.standardized.path
                     )
                     if file.url.standardized.path.hasSuffix(setting) {
                         return true

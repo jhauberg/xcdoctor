@@ -5,16 +5,17 @@
 //  Created by Jacob Hauberg Hansen on 14/07/2020.
 //
 
-@testable import XCDoctor
-
 import Foundation
 import XCTest
+
+@testable import XCDoctor
 
 class DiagnosisTests: XCTestCase {
     func testMissingFile() {
         let result = XcodeProject.openAndEvaluate(from: projectUrl(for: .nonExistentFiles))
         guard let project = try? result.get() else {
-            XCTFail(); return
+            XCTFail()
+            return
         }
         let diagnosis = examine(project: project, for: .nonExistentFiles)
         XCTAssertNotNil(diagnosis)
@@ -25,7 +26,8 @@ class DiagnosisTests: XCTestCase {
     func testMissingFolder() {
         let result = XcodeProject.openAndEvaluate(from: projectUrl(for: .nonExistentPaths))
         guard let project = try? result.get() else {
-            XCTFail(); return
+            XCTFail()
+            return
         }
         let diagnosis = examine(project: project, for: .nonExistentPaths)
         XCTAssertNotNil(diagnosis)
@@ -37,7 +39,8 @@ class DiagnosisTests: XCTestCase {
         let condition: Defect = .corruptPropertyLists
         let result = XcodeProject.openAndEvaluate(from: projectUrl(for: condition))
         guard let project = try? result.get() else {
-            XCTFail(); return
+            XCTFail()
+            return
         }
         let diagnosis = examine(project: project, for: condition)
         XCTAssertNotNil(diagnosis)
@@ -49,7 +52,8 @@ class DiagnosisTests: XCTestCase {
         let condition: Defect = .danglingFiles
         let result = XcodeProject.openAndEvaluate(from: projectUrl(for: condition))
         guard let project = try? result.get() else {
-            XCTFail(); return
+            XCTFail()
+            return
         }
         let diagnosis = examine(project: project, for: condition)
         XCTAssertNotNil(diagnosis)
@@ -61,14 +65,17 @@ class DiagnosisTests: XCTestCase {
         let condition: Defect = .emptyGroups
         let result = XcodeProject.openAndEvaluate(from: projectUrl(for: condition))
         guard let project = try? result.get() else {
-            XCTFail(); return
+            XCTFail()
+            return
         }
         let diagnosis = examine(project: project, for: condition)
         guard let cases = diagnosis?.cases else {
-            XCTFail(); return
+            XCTFail()
+            return
         }
         guard cases.count == 2 else {
-            XCTFail(); return
+            XCTFail()
+            return
         }
         XCTAssert(cases.contains("xcdoctor/a"))
         XCTAssert(cases.contains("xcdoctor/b/c/d"))
@@ -78,14 +85,17 @@ class DiagnosisTests: XCTestCase {
         let condition: Defect = .emptyTargets
         let result = XcodeProject.openAndEvaluate(from: projectUrl(for: condition))
         guard let project = try? result.get() else {
-            XCTFail(); return
+            XCTFail()
+            return
         }
         let diagnosis = examine(project: project, for: condition)
         guard let cases = diagnosis?.cases else {
-            XCTFail(); return
+            XCTFail()
+            return
         }
         guard cases.count == 2 else {
-            XCTFail(); return
+            XCTFail()
+            return
         }
         XCTAssert(cases.contains("xcdoctor"))
         XCTAssert(cases.contains("empty"))

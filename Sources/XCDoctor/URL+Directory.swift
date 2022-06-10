@@ -10,7 +10,8 @@ import Foundation
 
 extension URL {
     var isDirectory: Bool {
-        let values = try? resourceValues(forKeys: [.isDirectoryKey])
-        return values?.isDirectory ?? false
+        (try? resourceValues(forKeys: [.isDirectoryKey])
+            .isDirectory  // file exists and is a directory
+        ) ?? false  // file does not exist
     }
 }

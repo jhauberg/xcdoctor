@@ -6,9 +6,8 @@
 //  Copyright © 2020 Jacob Hauberg Hansen. All rights reserved.
 //
 
-import Foundation
-
 import ArgumentParser
+import Foundation
 import XCDoctor
 
 var outputStream = DiagnosticOutputStream()
@@ -24,7 +23,7 @@ func printdiag(text: String, kind: Diagnostic = .information) {
     //       consider applying these earlier; i.e. when initializating a diagnosis?
     switch kind {
     case .information:
-        break // no rules
+        break  // no rules
     case .important:
         assert(!text.hasSuffix("."), "Important diagnostics should not end with a period.")
         assert(text.lowercased() == text, "Important diagnostics should always be lowercase.")
@@ -46,8 +45,8 @@ func printdiag(text: String, kind: Diagnostic = .information) {
     if outputStream.supportsColor {
         switch kind {
         case .information,
-             .note:
-            break // no color
+            .note:
+            break  // no color
         case .important:
             diagnostic = "\u{1B}[0;31m\(diagnostic)\u{1B}[0m"
         case .result:
@@ -61,34 +60,37 @@ func printdiag(text: String, kind: Diagnostic = .information) {
 struct Doctor: ParsableCommand {
     static var configuration = CommandConfiguration(
         commandName: "xcdoctor",
-        version: "0.5.1"
+        version: "0.6.0"
     )
 
-    @Argument(help:
-        """
-        A path to an Xcode project file (for example, "MyProject.xcodeproj").
+    @Argument(
+        help: """
+            A path to an Xcode project file (for example, "MyProject.xcodeproj").
 
-        You can put in a path to a directory to automatically
-        look for a project at that location, or "." to look
-        for a project in the current working directory.
-        """)
+            You can put in a path to a directory to automatically
+            look for a project at that location, or "." to look
+            for a project in the current working directory.
+            """
+    )
     var xcodeproj: String
 
     // one might want to keep commented code, as it may some day be put in again-
     // if it has not been removed, it is likely that it remains for a reason
     // but this is an optional choice; prefer stripping unless otherwise specified
-    @Flag(name: .long,
-          help:
-          """
-          Don't strip comments from source files (block, line and xml comments).
-          """)
+    @Flag(
+        name: .long,
+        help: """
+            Don't strip comments from source files (block, line and xml comments).
+            """
+    )
     var keepComments: Bool = false
 
-    @Flag(name: .shortAndLong,
-          help:
-          """
-          Show diagnostic messages.
-          """)
+    @Flag(
+        name: .shortAndLong,
+        help: """
+            Show diagnostic messages.
+            """
+    )
     var verbose: Bool = false
 
     mutating func run() throws {
@@ -100,12 +102,16 @@ struct Doctor: ParsableCommand {
                 .appendingPathComponent(xcodeproj)
         }
 
-        let opening: XcodeProject.EventCallback? = verbose ? { name in
-            printdiag(text: "Opening \(name) ...")
-        } : nil
-        let evaluating: XcodeProject.EventCallback? = verbose ? { name in
-            printdiag(text: "Evaluating \(name) ...")
-        } : nil
+        let opening: XcodeProject.EventCallback? =
+            verbose
+            ? { name in
+                printdiag(text: "Opening \(name) ...")
+            } : nil
+        let evaluating: XcodeProject.EventCallback? =
+            verbose
+            ? { name in
+                printdiag(text: "Evaluating \(name) ...")
+            } : nil
 
         let project: XcodeProject
         switch XcodeProject.openAndEvaluate(
@@ -121,7 +127,8 @@ struct Doctor: ParsableCommand {
                 printdiag(text: "\(url.standardized.path): \(reason)")
             case let .notSpecified(projectFiles):
                 printdiag(
-                    text: "\(url.standardized.path): several projects found; specify further: \(projectFiles)"
+                    text:
+                        "\(url.standardized.path): several projects found; specify further: \(projectFiles)"
                 )
             case let .notFound(amongFilesInDirectory):
                 if amongFilesInDirectory {
@@ -149,6 +156,7 @@ struct Doctor: ParsableCommand {
             .nonExistentFiles,
             .nonExistentPaths,
         ]
+
         for condition in conditions {
             if verbose {
                 // save column at end for activity indication
@@ -161,23 +169,25 @@ struct Doctor: ParsableCommand {
                 printdiag(text: "Examining for \(condition) ... \(position)")
             }
 
-            let activity: ExaminationProgressCallback? = verbose ? { n, total, info in
-                let indicator = "[\(n)/\(total)]"
-                let message: String
-                if let info = info {
-                    message = "\(indicator) \(info)"
-                } else {
-                    message = "\(indicator)"
-                }
+            let activity: ExaminationProgressCallback? =
+                verbose
+                ? { n, total, info in
+                    let indicator = "[\(n)/\(total)]"
+                    let message: String
+                    if let info = info {
+                        message = "\(indicator) \(info)"
+                    } else {
+                        message = "\(indicator)"
+                    }
 
-                // move cursor to previous line at saved column and clear to end
-                // (also clearing any newline)
-                // note ESC 8, not CSI u - this is compatible with Terminal.app
-                // note that this does not work correctly if output causes display to scroll
-                let position = "\u{1B}8\u{1B}[1A\u{1B}[K"
+                    // move cursor to previous line at saved column and clear to end
+                    // (also clearing any newline)
+                    // note ESC 8, not CSI u - this is compatible with Terminal.app
+                    // note that this does not work correctly if output causes display to scroll
+                    let position = "\u{1B}8\u{1B}[1A\u{1B}[K"
 
-                printdiag(text: "\(position)\(message)")
-            } : nil
+                    printdiag(text: "\(position)\(message)")
+                } : nil
 
             if let diagnosis = examine(
                 project: project,

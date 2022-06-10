@@ -5,14 +5,14 @@ import PackageDescription
 let package = Package(
     name: "xcdoctor",
     platforms: [
-        .macOS(.v10_11),
+        .macOS(.v10_11)
     ],
     products: [
         .executable(name: "xcdoctor", targets: ["CLI"]),
         .library(name: "XCDoctor", targets: ["XCDoctor"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.1.2"),
+        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.1.2")
     ],
     targets: [
         .executableTarget(
