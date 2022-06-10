@@ -44,7 +44,7 @@ enum Diagnostic {
     }
 }
 
-final class DiagnosticOutputStream: TextOutputStream {
+struct DiagnosticOutputStream: TextOutputStream {
     /**
      Determine whether the terminal supports escape codes for applying colors.
      */
