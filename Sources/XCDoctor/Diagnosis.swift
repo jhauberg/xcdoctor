@@ -272,14 +272,19 @@ private enum SourcePatterns {
     static let blockComments =
         try! NSRegularExpression(pattern:
             // note the #..# to designate a raw string, allowing the \* literal
-            #"/\*(?:.|[\n])*?\*/"#)
+             #"/\*"# + // starting point of a block comment
+             ".*?" + // anything between, lazily
+             #"\*/"#, // ending point of a block comment
+             options: [.dotMatchesLineSeparators]
+        )
     static let lineComments =
         try! NSRegularExpression(pattern:
-            "(?:[^:]|^)" + // avoid matching URLs in code, but anything else goes
-                "//" + // starting point of a single-line comment
-                ".*?" + // anything following
-                "(?:\n|$)", // until reaching end of string or a newline
-            options: [.anchorsMatchLines])
+            "(?<!:)" +  // avoid any case where the previous character is ":" (i.e. skipping URLs)
+            "//" + // starting point of a single-line comment
+            "[^\n\r]*?" + // anything following that is not a newline
+            "(?:[\n\r]|$)", // until reaching end of string or a newline
+            options: [.anchorsMatchLines]
+        )
     static let htmlComments =
         try! NSRegularExpression(pattern:
             // strip HTML/XML comments
