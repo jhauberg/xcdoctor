@@ -163,27 +163,50 @@ private extension String {
     }
 }
 
+private func fontFamilyVariants(from url: URL) -> [String] {
+    guard let data = NSData(contentsOf: url),
+            let provider = CGDataProvider(data: data),
+            let font = CGFont(provider) else {
+        return []
+    }
+    var variants: [String] = []
+    if let fullName = font.fullName {
+        variants.append(String(fullName))
+    }
+    if let postScriptName = font.postScriptName {
+        variants.append(String(postScriptName))
+    }
+    return variants
+}
+
 private struct Resource {
+    let url: URL
     let name: String
-    let fileName: String?
+    let fileName: String
     let nameVariants: [String]
-    init(name: String, fileName: String? = nil) {
-        self.name = name
-        self.fileName = fileName
-        if let fileName = fileName {
-            let plainName = name.removingScaleFactors
-            let plainFileName = fileName.removingScaleFactors
-            nameVariants = Array(Set([
-                name,
-                fileName,
-                plainName,
-                plainFileName,
-            ]))
-        } else {
-            // if a filename has not been set, we can be reasonably certain that
-            // this is not a file that has assigned scale factors
-            nameVariants = [name]
+
+    init(at url: URL) {
+        self.url = url
+
+        name = url.deletingPathExtension().lastPathComponent
+        fileName = url.lastPathComponent
+
+        var names: [String] = [
+            name,
+            name.removingScaleFactors,
+            fileName,
+            fileName.removingScaleFactors
+        ]
+
+        if url.pathExtension == "ttf" || url.pathExtension == "otf" {
+            names.append(
+                contentsOf: fontFamilyVariants(from: url)
+            )
         }
+
+        nameVariants = Array(
+            Set(names) // remove any potential duplicates
+        )
     }
 }
 
@@ -208,8 +231,7 @@ private func resources(in project: XcodeProject) -> [Resource] {
                 ref.url == sourceRef.url
             }
     }.map { ref -> Resource in
-        Resource(name: ref.url.deletingPathExtension().lastPathComponent,
-                 fileName: ref.url.lastPathComponent)
+        Resource(at: ref.url)
     }
 }
 
@@ -263,7 +285,7 @@ private func assets(in project: XcodeProject) -> [Resource] {
         ref.kind == "folder.assetcatalog" || ref.url.pathExtension == "xcassets"
     }.flatMap { ref -> [Resource] in
         assetURLs(at: ref.url).map { assetUrl -> Resource in
-            Resource(name: assetUrl.deletingPathExtension().lastPathComponent)
+            Resource(at: assetUrl)
         }
     }
 }
@@ -289,11 +311,16 @@ private enum SourcePatterns {
         try! NSRegularExpression(pattern:
             // strip HTML/XML comments
             "<!--.+?-->",
-            options: [.dotMatchesLineSeparators])
-    static let appFonts = try! NSRegularExpression(pattern:
-        // strip this particular and iOS specific plist-entry
-        "<key>UIAppFonts</key>.+?</array>",
-        options: [.dotMatchesLineSeparators])
+            options: [.dotMatchesLineSeparators]
+        )
+    static let appFonts =
+        try! NSRegularExpression(pattern:
+            // strip this particular and iOS specific plist-entry;
+            // the reasoning is that these font resources should not be considered "in-use"
+            // just by being defined in this plist entry- only if they also appear elsewhere
+            "<key>UIAppFonts</key>.+?</array>",
+            options: [.dotMatchesLineSeparators]
+        )
 }
 
 // TODO: optionally include some info, Any? for printout under DEBUG/verbose
