@@ -311,7 +311,7 @@ private func assets(in project: XcodeProject) -> [Resource] {
         }
 }
 
-private enum SourcePatterns {
+private enum SourcePattern {
     static let blockComments =
         try! NSRegularExpression(
             pattern:
@@ -482,17 +482,17 @@ public func examine(
                 if strippingComments {
                     patterns.append(contentsOf: [
                         // note prioritized order: strip block comments before line comments
-                        SourcePatterns.blockComments, SourcePatterns.lineComments,
+                        SourcePattern.blockComments, SourcePattern.lineComments,
                     ])
                 }
             } else if source.kind == "text.xml" || source.kind == "text.html"
                 || source.url.pathExtension == "xml" || source.url.pathExtension == "html"
             {
-                patterns.append(SourcePatterns.htmlComments)
+                patterns.append(SourcePattern.htmlComments)
             } else if source.kind == "text.plist.xml" || source.url.pathExtension == "plist",
                 project.referencesPropertyListAsInfoPlist(named: source)
             {
-                patterns.append(SourcePatterns.appFonts)
+                patterns.append(SourcePattern.appFonts)
             }
 
             let strippedFileContents =
