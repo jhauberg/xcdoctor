@@ -46,7 +46,7 @@ struct Doctor: ParsableCommand {
 
     @Argument(help:
         """
-        A path to an Xcode project file.
+        A path to an Xcode project file (for example, "MyProject.xcodeproj").
 
         You can put in a path to a directory to automatically
         look for a project at that location, or "." to look
@@ -135,7 +135,9 @@ struct Doctor: ParsableCommand {
                 // note that this is assumed to be _before_ end (e.g. newline)
                 // note ESC 7, not CSI s - this is compatible with Terminal.app
                 let position = "\u{1B}7"
-
+                // TODO: consider a pretty name for condition; currently can be long
+                //       but also quite informative;
+                // e.g. "Examining for unusedResources(strippingSourceComments: false) ... [99/99]"
                 printdiag(text: "Examining for \(condition) ... \(position)")
             }
 
