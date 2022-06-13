@@ -9,6 +9,9 @@
 import Foundation
 
 extension URL {
+    /**
+     A Boolean that is `true` if the URL points to a directory that exists.
+     */
     var isDirectory: Bool {
         (try? resourceValues(forKeys: [.isDirectoryKey])
             .isDirectory  // file exists and is a directory

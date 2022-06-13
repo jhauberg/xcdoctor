@@ -51,7 +51,6 @@ struct GroupReference {
 
 struct FileReference {
     let url: URL
-    // TODO: could add visual/project url here as well to help locating a non-existent file in project
     let kind: String?
     let hasTargetMembership: Bool
 

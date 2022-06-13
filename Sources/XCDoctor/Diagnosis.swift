@@ -17,7 +17,7 @@ public enum Defect {
      */
     case nonExistentFiles
     /**
-     A condition that applies if any property-list (.plist) fails to convert to a
+     A condition that applies if any property-list (".plist") fails to convert to a
      serialized representation.
      */
     case corruptPropertyLists
@@ -44,8 +44,11 @@ public enum Defect {
      */
     case unusedResources(strippingSourceComments: Bool)
     /**
-     A condition that applies if any asset set does not contain any files other than asset catalog
-     information (i.e. `Contents.json`).
+     A condition that applies if any asset set does not contain any files or resources
+     other than asset catalog information (i.e. "Contents.json").
+
+     For `.colorset` assets, the condition applies if the catalog information does not contain
+     any color components.
      */
     case emptyAssets
     /**
@@ -253,7 +256,7 @@ private func resourceFiles(in project: XcodeProject) -> [Resource] {
 
 extension URL {
     /**
-     Return true if the url points to a directory containing a `Contents.json` file.
+     A Boolean that is `true` if the URL points to a directory containing a "Contents.json" file.
      */
     fileprivate var isAssetURL: Bool {
         FileManager.default.fileExists(
