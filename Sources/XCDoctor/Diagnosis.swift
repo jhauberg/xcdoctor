@@ -559,18 +559,59 @@ public func examine(
             )
         }
     case .emptyAssets:
-        let emptyAssets = assetFiles(in: project)
+        let assets = assetFiles(in: project)
+
+        let colorAssets =
+            assets
             .filter { asset in
-                // find all asset sets where there's no additional files other than a `Contents.json`
+                asset.url.pathExtension == "colorset"
+            }
+
+        let emptyColorAssets = colorAssets.filter { asset in
+            do {
+                let string = try String(
+                    contentsOf: asset.url.appendingPathComponent("Contents.json")
+                )
+                if let data = string.data(using: .utf8) {
+                    // see https://developer.apple.com/library/archive/documentation/Xcode/Reference/xcode_ref-Asset_Catalog_Format/Named_Color.html#//apple_ref/doc/uid/TP40015170-CH59-SW1
+                    if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                        let colors = json["colors"] as? [[String: Any]]
+                    {
+                        for listing in colors {
+                            if let color = listing["color"] as? [String: Any], !color.isEmpty {
+                                return false
+                            }
+                        }
+                    }
+                }
+            } catch {
+                // potentially corrupt; consider this empty for now
+            }
+            return true
+        }
+
+        let fileAssets =
+            assets
+            .filter { asset in
+                !colorAssets.contains(asset)
+            }
+
+        let emptyFileAssets =
+            fileAssets
+            .filter { asset in
+                // find all asset sets with no additional files other than a "Contents.json"
+                // (assuming that one always exists in asset sets)
                 (try?
                     FileManager.default
                     .contentsOfDirectory(
                         at: asset.url,
                         includingPropertiesForKeys: nil
                     )
-                    .count < 2
-                ) ?? false
+                    .count < 2) ?? false
             }
+
+        let emptyAssets = emptyFileAssets + emptyColorAssets
+
         if !emptyAssets.isEmpty {
             return Diagnosis(
                 conclusion: "empty assets",
