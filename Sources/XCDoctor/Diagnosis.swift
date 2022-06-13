@@ -43,6 +43,7 @@ public enum Defect {
      false-positive that this resource is not used because it does not literally appear verbatim.
      */
     case unusedResources(strippingSourceComments: Bool)
+    case emptyAssets
     /**
      A condition that applies if any groups (including non-folder groups) resolves to
      a path that does not exist on disk.
@@ -451,11 +452,12 @@ public func examine(
     case .unusedResources(let strippingComments):
         // find asset files; i.e. files inside asset catalogs, excluding those referenced by certain
         // build settings as these typically won't be found using full-text search in sourcefiles
-        let assets = assetFiles(in: project).filter { asset in
-            // note that we should only need to check `name` here; other variants do not seem
-            // to be referenced for these settings
-            !project.referencesAssetForCatalogCompilation(named: asset.name)
-        }
+        let assets = assetFiles(in: project)
+            .filter { asset in
+                // note that we should only need to check `name` here; other variants do not seem
+                // to be referenced for these settings
+                !project.referencesAssetForCatalogCompilation(named: asset.name)
+            }
         var resources = resourceFiles(in: project) + assets
         // full-text search every source-file
         let sources = sourceFiles(in: project)
@@ -545,11 +547,35 @@ public func examine(
                     detect all usage patterns with certainty. Proceed with caution.
                     """,
                 cases: resources.map { resource -> String in
-                    // TODO: resources always have filenames now; so we no longer have an easy
-                    //       way of distinguishing between container/catalog resources by name-
-                    //       maybe this is ok? i.e. previous "resource" is now "resource.imageset"
-                    //       the latter is tied to filesystem, while the former is obvious inside Xcode
-                    resource.fileName ?? resource.name
+                    if resource.url.isAssetURL {
+                        return resource.name
+                    }
+                    return resource.fileName
+                }
+            )
+        }
+    case .emptyAssets:
+        let emptyAssets = assetFiles(in: project)
+            .filter { asset in
+                // find all asset sets where there's no additional files other than a `Contents.json`
+                (try?
+                    FileManager.default
+                    .contentsOfDirectory(
+                        at: asset.url,
+                        includingPropertiesForKeys: nil
+                    )
+                    .count < 2
+                ) ?? false
+            }
+        if !emptyAssets.isEmpty {
+            return Diagnosis(
+                conclusion: "empty assets",
+                help: """
+                    These asset sets contain zero actual resources and might be redundant;
+                    consider whether they should be removed.
+                    """,
+                cases: emptyAssets.map { asset -> String in
+                    asset.name
                 }
             )
         }
