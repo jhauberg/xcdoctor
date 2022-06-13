@@ -43,6 +43,10 @@ public enum Defect {
      false-positive that this resource is not used because it does not literally appear verbatim.
      */
     case unusedResources(strippingSourceComments: Bool)
+    /**
+     A condition that applies if any asset set does not contain any files other than asset catalog
+     information (i.e. `Contents.json`).
+     */
     case emptyAssets
     /**
      A condition that applies if any groups (including non-folder groups) resolves to
