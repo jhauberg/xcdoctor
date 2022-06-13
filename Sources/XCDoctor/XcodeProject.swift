@@ -452,13 +452,20 @@ public final class XcodeProject {
     let groups: [GroupReference]
     let products: [ProductReference]
 
-    func referencesAssetAsAppIcon(named asset: String) -> Bool {
+    // TODO: assets could be empty asset catalogs; in this case, consider those unused even if referenced?
+    let assetCatalogCompilerSettings = [
+        "ASSETCATALOG_COMPILER_APPICON_NAME",
+        "ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME",
+        "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME",
+        "ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME"
+    ]
+
+    func referencesAssetForCatalogCompilation(named asset: String) -> Bool {
         for object in buildConfigurations {
             if let settings = object.properties["buildSettings"] as? [String: Any] {
-                if let appIconSetting =
-                    settings["ASSETCATALOG_COMPILER_APPICON_NAME"] as? String
-                {
-                    if appIconSetting == asset {
+                for assetCompilerSetting in assetCatalogCompilerSettings {
+                    if let assetCompilerSettingValue = settings[assetCompilerSetting] as? String,
+                       assetCompilerSettingValue == asset {
                         return true
                     }
                 }

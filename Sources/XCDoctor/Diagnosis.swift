@@ -219,7 +219,7 @@ private struct Resource {
     }
 }
 
-private func resources(in project: XcodeProject) -> [Resource] {
+private func resourceFiles(in project: XcodeProject) -> [Resource] {
     let sources = sourceFiles(in: project)
         .filter { ref -> Bool in
             // exclude xml/html files as sources; consider them both source and resource
@@ -298,7 +298,7 @@ private func assetURLs(at url: URL) -> [URL] {
         }
 }
 
-private func assets(in project: XcodeProject) -> [Resource] {
+private func assetFiles(in project: XcodeProject) -> [Resource] {
     project.files
         .filter { ref -> Bool in
             ref.kind == "folder.assetcatalog" || ref.url.pathExtension == "xcassets"
@@ -449,18 +449,14 @@ public func examine(
             )
         }
     case .unusedResources(let strippingComments):
-        var res = resources(in: project) + assets(in: project)
-        // find special cases, e.g. AppIcon
-        res.removeAll { resource -> Bool in
-            for resourceName in resource.nameVariants {
-                if project.referencesAssetAsAppIcon(named: resourceName) {
-                    // resource seems to be used; remove and don't search further for this
-                    return true
-                }
-            }
-            // resource seems to be unused; don't remove and keep searching for usages
-            return false
+        // find asset files; i.e. files inside asset catalogs, excluding those referenced by certain
+        // build settings as these typically won't be found using full-text search in sourcefiles
+        let assets = assetFiles(in: project).filter { asset in
+            // note that we should only need to check `name` here; other variants do not seem
+            // to be referenced for these settings
+            !project.referencesAssetForCatalogCompilation(named: asset.name)
         }
+        var resources = resourceFiles(in: project) + assets
         // full-text search every source-file
         let sources = sourceFiles(in: project)
         for (n, source) in sources.enumerated() {
@@ -499,7 +495,7 @@ public func examine(
                 fileContents
                 .removingOccurrences(matchingExpressions: patterns)
 
-            res.removeAll { resource -> Bool in
+            resources.removeAll { resource -> Bool in
                 for resourceName in resource.nameVariants {
                     let searchStrings: [String]
                     if let kind = source.kind, kind.starts(with: "sourcecode") {
@@ -540,7 +536,7 @@ public func examine(
 
         progress?(sources.count, sources.count, nil)
 
-        if !res.isEmpty {
+        if !resources.isEmpty {
             return Diagnosis(
                 conclusion: "unused resources",
                 help: """
@@ -548,7 +544,7 @@ public func examine(
                     Note that this diagnosis is prone to false-positives as it can't realistically
                     detect all usage patterns with certainty. Proceed with caution.
                     """,
-                cases: res.map { resource -> String in
+                cases: resources.map { resource -> String in
                     // TODO: resources always have filenames now; so we no longer have an easy
                     //       way of distinguishing between container/catalog resources by name-
                     //       maybe this is ok? i.e. previous "resource" is now "resource.imageset"
