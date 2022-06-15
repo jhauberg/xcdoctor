@@ -85,21 +85,16 @@ public struct Diagnosis {
 }
 
 private func nonExistentFiles(in project: XcodeProject) -> [FileReference] {
-    project.files.filter { ref -> Bool in
+    project.files.filter { ref in
         // include this reference if file does not exist
         !FileManager.default.fileExists(atPath: ref.path)
     }
 }
 
-private func nonExistentFilePaths(in project: XcodeProject) -> [String] {
-    nonExistentFiles(in: project)
-        .map { ref -> String in
-            ref.path
-        }
-}
-
-func nonExistentGroups(in project: XcodeProject) -> [GroupReference] {
-    project.groups.filter { ref -> Bool in
+private func nonExistentGroups(
+    in project: XcodeProject
+) -> [GroupReference] {
+    project.groups.filter { ref in
         if let path = ref.path {
             return !FileManager.default.fileExists(atPath: path)
         }
@@ -107,62 +102,42 @@ func nonExistentGroups(in project: XcodeProject) -> [GroupReference] {
     }
 }
 
-private func nonExistentGroupPaths(in project: XcodeProject) -> [String] {
-    nonExistentGroups(in: project)
-        .map { ref -> String in
-            "\(ref.path!): \"\(ref.projectUrl.absoluteString)\""
-        }
-}
-
 private func emptyGroups(in project: XcodeProject) -> [GroupReference] {
-    project.groups.filter { ref -> Bool in
+    project.groups.filter { ref in
         !ref.hasChildren
     }
 }
 
-private func emptyGroupPaths(in project: XcodeProject) -> [String] {
-    emptyGroups(in: project)
-        .map { ref -> String in
-            "\(ref.projectUrl.absoluteString)"
-        }
-}
-
-private func emptyTargetNames(in project: XcodeProject) -> [String] {
-    project.products
-        .filter { ref -> Bool in
-            !ref.buildsSourceFiles
-        }
-        .map { product -> String in
-            product.name
-        }
+private func emptyTargets(in project: XcodeProject) -> [ProductReference] {
+    project.products.filter { ref in
+        !ref.buildsSourceFiles
+    }
 }
 
 private func propertyListReferences(in project: XcodeProject) -> [FileReference] {
-    project.files.filter { ref -> Bool in
+    project.files.filter { ref in
         ref.kind == "text.plist.xml" || ref.url.pathExtension == "plist"
     }
 }
 
-private func danglingFilePaths(in project: XcodeProject) -> [String] {
+private func danglingFiles(
+    in project: XcodeProject
+) -> [FileReference] {
     project.files
-        .filter { ref -> Bool in
+        .filter { ref in
             !ref.isHeaderFile && ref.isSourceFile && !ref.hasTargetMembership
         }
-        .filter { ref -> Bool in
-            // handle the special-case Info.plist
+        .filter { ref in
             if ref.kind == "text.plist.xml" || ref.url.pathExtension == "plist" {
                 return !project.referencesPropertyListAsInfoPlist(named: ref)
             }
             return true
         }
-        .map { ref -> String in
-            ref.path
-        }
 }
 
 private func sourceFiles(in project: XcodeProject) -> [FileReference] {
     let exceptFiles = nonExistentFiles(in: project)
-    return project.files.filter { ref -> Bool in
+    return project.files.filter { ref in
         ref.isSourceFile  // file is compiled in one way or another
             && !ref.url.isDirectory  // file is text-based; i.e. not a directory
             && !exceptFiles.contains(where: { otherRef -> Bool in  // file exists
@@ -196,11 +171,15 @@ private func fontFamilyVariants(from url: URL) -> [String] {
     return variants
 }
 
-private struct Resource {
+private struct Resource: Equatable {
     let url: URL
     let name: String
     let fileName: String
     let nameVariants: [String]
+
+    var path: String {
+        url.standardized.relativePath
+    }
 
     init(at url: URL) {
         self.url = url
@@ -229,7 +208,7 @@ private struct Resource {
 
 private func resourceFiles(in project: XcodeProject) -> [Resource] {
     let sources = sourceFiles(in: project)
-        .filter { ref -> Bool in
+        .filter { ref in
             // exclude xml/html files as sources; consider them both source and resource
             // TODO: this is a bit of a slippery slope; where do we draw the line?
             //       stuff like JSON and YAML probably fits here as well, etc. etc. ...
@@ -237,7 +216,7 @@ private func resourceFiles(in project: XcodeProject) -> [Resource] {
                 && ref.url.pathExtension != "html"
         }
     return project.files
-        .filter { ref -> Bool in
+        .filter { ref in
             // TODO: specific exclusions? e.g. "archive.ar"/"a", ".whatever" etc
             ref.hasTargetMembership && ref.kind != "folder.assetcatalog"  // not an assetcatalog
                 && ref.url.pathExtension != "xcassets"  // not an assetcatalog
@@ -249,7 +228,7 @@ private func resourceFiles(in project: XcodeProject) -> [Resource] {
                     ref.url == sourceRef.url  // not a source-file
                 }
         }
-        .map { ref -> Resource in
+        .map { ref in
             Resource(at: ref.url)
         }
 }
@@ -298,22 +277,22 @@ private func assetURLs(at url: URL) -> [URL] {
     }
 
     return
-        dirEnumerator.map { item -> URL in
+        dirEnumerator.map { item in
             item as! URL
         }
-        .filter { url -> Bool in
+        .filter { url in
             url.isDirectory && url.isAssetURL && !url.pathExtension.isEmpty
         }
 }
 
 private func assetFiles(in project: XcodeProject) -> [Resource] {
     project.files
-        .filter { ref -> Bool in
+        .filter { ref in
             ref.kind == "folder.assetcatalog" || ref.url.pathExtension == "xcassets"
         }
-        .flatMap { ref -> [Resource] in
+        .flatMap { ref in
             assetURLs(at: ref.url)
-                .map { assetUrl -> Resource in
+                .map { assetUrl in
                     Resource(at: assetUrl)
                 }
         }
@@ -364,23 +343,28 @@ public func examine(
     for defect: Defect,
     progress: ExaminationProgressCallback? = nil
 ) -> Diagnosis? {
-    // TODO: why not show progress for basically every case?
     switch defect {
     case .nonExistentFiles:
-        let filePaths = nonExistentFilePaths(in: project)
-        if !filePaths.isEmpty {
+        let files = nonExistentFiles(in: project)
+        if !files.isEmpty {
+            let paths = files.map { ref in
+                ref.path
+            }
             return Diagnosis(
                 conclusion: "non-existent files",
                 help: """
                     These files are not present on the file system and could have been moved or removed.
                     In either case, each reference should be resolved or removed from the project.
                     """,
-                cases: filePaths
+                cases: paths
             )
         }
     case .nonExistentPaths:
-        let dirPaths = nonExistentGroupPaths(in: project)
-        if !dirPaths.isEmpty {
+        let groups = nonExistentGroups(in: project)
+        if !groups.isEmpty {
+            let paths = groups.map { ref in
+                "\(ref.path!): \"\(ref.projectUrl.absoluteString)\""
+            }
             return Diagnosis(
                 conclusion: "non-existent group paths",
                 // TODO: word this differently; a non-existent path is typically harmless:
@@ -400,60 +384,72 @@ public func examine(
                     If not corrected, these paths can cause tools to erroneously
                     map children of each group to non-existent files.
                     """,
-                cases: dirPaths
+                cases: paths
             )
         }
     case .corruptPropertyLists:
-        let files = propertyListReferences(in: project)
-        var corruptedFilePaths: [String] = []
-        for (n, file) in files.enumerated() {
-            #if DEBUG
-                progress?(n + 1, files.count, file.url.lastPathComponent)
-            #else
-                progress?(n + 1, files.count, nil)
-            #endif
+        let propertyLists = propertyListReferences(in: project)
 
-            do {
-                _ = try PropertyListSerialization.propertyList(
-                    from: try Data(contentsOf: file.url),
-                    format: nil
-                )
-            } catch let error as NSError {
-                let additionalInfo: String
-                if let helpfulErrorMessage = error.userInfo[NSDebugDescriptionErrorKey] as? String {
-                    // this is typically along the lines of:
-                    //  "Value missing for key inside <dict> at line 7"
-                    additionalInfo = helpfulErrorMessage
-                } else {
-                    // this is typically more like:
-                    //  "The data couldn’t be read because it isn’t in the correct format."
-                    additionalInfo = error.localizedDescription
+        let corruptedPropertyLists =
+            propertyLists
+            .enumerated()
+            .compactMap({ n, file -> (FileReference, String)? in
+                #if DEBUG
+                    progress?(n + 1, propertyLists.count, file.url.lastPathComponent)
+                #else
+                    progress?(n + 1, propertyLists.count, nil)
+                #endif
+
+                do {
+                    _ = try PropertyListSerialization.propertyList(
+                        from: try Data(contentsOf: file.url),
+                        format: nil
+                    )
+                } catch let error as NSError {
+                    let additionalInfo: String
+                    if let helpfulErrorMessage = error.userInfo[NSDebugDescriptionErrorKey]
+                        as? String
+                    {
+                        // this is typically along the lines of:
+                        //  "Value missing for key inside <dict> at line 7"
+                        additionalInfo = helpfulErrorMessage
+                    } else {
+                        // this is typically more like:
+                        //  "The data couldn’t be read because it isn’t in the correct format."
+                        additionalInfo = error.localizedDescription
+                    }
+                    return (file, additionalInfo)
                 }
-                corruptedFilePaths.append("\(file.path): \(additionalInfo)")
+                return nil
+            })
+
+        progress?(propertyLists.count, propertyLists.count, nil)
+
+        if !corruptedPropertyLists.isEmpty {
+            let paths = corruptedPropertyLists.map { file, additionalInfo in
+                "\(file.path): \(additionalInfo)"
             }
-        }
-
-        progress?(files.count, files.count, nil)
-
-        if !corruptedFilePaths.isEmpty {
             return Diagnosis(
                 conclusion: "corrupted plists",
                 help: """
                     These files must be fixed manually using any plain-text editor.
                     """,
-                cases: corruptedFilePaths
+                cases: paths
             )
         }
     case .danglingFiles:
-        let filePaths = danglingFilePaths(in: project)
-        if !filePaths.isEmpty {
+        let files = danglingFiles(in: project)
+        if !files.isEmpty {
+            let paths = files.map { file in
+                file.path
+            }
             return Diagnosis(
                 conclusion: "files not included in any target",
                 help: """
                     These files are never being compiled and might not be used;
                     consider whether they should be removed.
                     """,
-                cases: filePaths
+                cases: paths
             )
         }
     case .unusedResources(let strippingComments):
@@ -504,7 +500,9 @@ public func examine(
                 fileContents
                 .removingOccurrences(matchingExpressions: patterns)
 
-            resources.removeAll { resource -> Bool in
+            resources.removeAll { resource in
+                // TODO: case-sensitive search, but UIImage/Font(named: might not be case sensitive
+                //       - would have to lower-case entire sourcefile too; can't catch mixed case errors otherwise
                 for resourceName in resource.nameVariants {
                     let searchStrings: [String]
                     if let kind = source.kind, kind.starts(with: "sourcecode") {
@@ -546,6 +544,12 @@ public func examine(
         progress?(sources.count, sources.count, nil)
 
         if !resources.isEmpty {
+            let unusedResourceNames = resources.map { resource -> String in
+                if resource.url.isAssetURL {
+                    return resource.name
+                }
+                return resource.fileName
+            }
             return Diagnosis(
                 conclusion: "unused resources",
                 help: """
@@ -553,24 +557,26 @@ public func examine(
                     Note that this diagnosis is prone to false-positives as it can't realistically
                     detect all usage patterns with certainty. Proceed with caution.
                     """,
-                cases: resources.map { resource -> String in
-                    if resource.url.isAssetURL {
-                        return resource.name
-                    }
-                    return resource.fileName
-                }
+                cases: unusedResourceNames
             )
         }
     case .emptyAssets:
         let assets = assetFiles(in: project)
 
-        let colorAssets =
-            assets
-            .filter { asset in
-                asset.url.pathExtension == "colorset"
-            }
+        let colorAssets = assets.filter { asset in
+            asset.url.pathExtension == "colorset"
+        }
+
+        var n: Int = 0
+        let total: Int = assets.count
 
         let emptyColorAssets = colorAssets.filter { asset in
+            n = n + 1
+            #if DEBUG
+                progress?(n, total, asset.url.lastPathComponent)
+            #else
+                progress?(n, total, nil)
+            #endif
             do {
                 let string = try String(
                     contentsOf: asset.url.appendingPathComponent("Contents.json")
@@ -593,62 +599,74 @@ public func examine(
             return true
         }
 
-        let fileAssets =
-            assets
-            .filter { asset in
-                !colorAssets.contains(asset)
-            }
+        let fileAssets = assets.filter { asset in
+            !colorAssets.contains(asset)
+        }
 
-        let emptyFileAssets =
-            fileAssets
-            .filter { asset in
-                // find all asset sets with no additional files other than a "Contents.json"
-                // (assuming that one always exists in asset sets)
+        let emptyFileAssets = fileAssets.filter { asset in
+            n = n + 1
+            #if DEBUG
+                progress?(n, total, asset.url.lastPathComponent)
+            #else
+                progress?(n, total, nil)
+            #endif
+            // find all asset sets with no additional files other than a "Contents.json"
+            // (assuming that one always exists in asset sets)
+            return
                 (try?
-                    FileManager.default
-                    .contentsOfDirectory(
-                        at: asset.url,
-                        includingPropertiesForKeys: nil
-                    )
-                    .count < 2) ?? false
-            }
+                FileManager.default
+                .contentsOfDirectory(
+                    at: asset.url,
+                    includingPropertiesForKeys: nil
+                )
+                .count < 2) ?? false
+        }
 
         let emptyAssets = emptyFileAssets + emptyColorAssets
 
+        progress?(total, total, nil)
+
         if !emptyAssets.isEmpty {
+            let emptyAssetNames = emptyAssets.map { asset in
+                asset.name
+            }
             return Diagnosis(
                 conclusion: "empty assets",
                 help: """
                     These asset sets contain zero actual resources and might be redundant;
                     consider whether they should be removed.
                     """,
-                cases: emptyAssets.map { asset -> String in
-                    asset.name
-                }
+                cases: emptyAssetNames
             )
         }
     case .emptyGroups:
-        let groupPaths = emptyGroupPaths(in: project)
-        if !groupPaths.isEmpty {
+        let groups = emptyGroups(in: project)
+        if !groups.isEmpty {
+            let paths = groups.map { ref in
+                "\(ref.projectUrl.absoluteString)"
+            }
             return Diagnosis(
                 conclusion: "empty groups",
                 help: """
                     These groups contain zero children and might be redundant;
                     consider whether they should be removed.
                     """,
-                cases: groupPaths
+                cases: paths
             )
         }
     case .emptyTargets:
-        let targetNames = emptyTargetNames(in: project)
-        if !targetNames.isEmpty {
+        let targets = emptyTargets(in: project)
+        if !targets.isEmpty {
+            let names = targets.map { product in
+                product.name
+            }
             return Diagnosis(
                 conclusion: "empty targets",
                 help: """
                     These targets do not compile any sources and might be redundant;
                     consider whether they should be removed.
                     """,
-                cases: targetNames
+                cases: names
             )
         }
     }
