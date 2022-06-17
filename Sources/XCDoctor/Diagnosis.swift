@@ -475,11 +475,8 @@ private func findUnusedResources(
             progress?(n + 1, sources.count, nil)
         #endif
 
-        let fileContents: String
-        do {
-            fileContents = try String(contentsOf: source.url)
-        } catch {
-            continue
+        guard let fileContents = try? String(contentsOf: source.url) else {
+            fatalError()
         }
 
         var patterns: [NSRegularExpression] = []
@@ -545,7 +542,7 @@ private func findUnusedResources(
     }
 
     progress?(sources.count, sources.count, nil)
-
+    // any remaining resource is deemed unused
     return resources
 }
 
