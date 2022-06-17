@@ -338,6 +338,228 @@ private enum SourcePattern {
 // TODO: optionally include some info, Any? for printout under DEBUG/verbose
 public typealias ExaminationProgressCallback = (Int, Int, String?) -> Void
 
+private struct CorruptPropertyListCase {
+    let file: FileReference
+    let reason: String
+}
+
+private func findCorruptPropertyLists(
+    in project: XcodeProject,
+    progress: ExaminationProgressCallback? = nil
+) -> [CorruptPropertyListCase] {
+    let propertyLists = propertyListReferences(in: project)
+
+    let corruptedPropertyLists =
+        propertyLists
+        .enumerated()
+        .compactMap({ n, file -> CorruptPropertyListCase? in
+            #if DEBUG
+                progress?(n + 1, propertyLists.count, file.url.lastPathComponent)
+            #else
+                progress?(n + 1, propertyLists.count, nil)
+            #endif
+
+            do {
+                _ = try PropertyListSerialization.propertyList(
+                    from: try Data(contentsOf: file.url),
+                    format: nil
+                )
+            } catch let error as NSError {
+                let additionalInfo: String
+                if let helpfulErrorMessage = error.userInfo[NSDebugDescriptionErrorKey]
+                    as? String
+                {
+                    // this is typically along the lines of:
+                    //  "Value missing for key inside <dict> at line 7"
+                    additionalInfo = helpfulErrorMessage
+                } else {
+                    // this is typically more like:
+                    //  "The data couldn’t be read because it isn’t in the correct format."
+                    additionalInfo = error.localizedDescription
+                }
+                return CorruptPropertyListCase(file: file, reason: additionalInfo)
+            }
+            return nil
+        })
+
+    progress?(propertyLists.count, propertyLists.count, nil)
+
+    return corruptedPropertyLists
+}
+
+private func findEmptyAssets(
+    in project: XcodeProject,
+    progress: ExaminationProgressCallback? = nil
+) -> [Resource] {
+    let assets = assetFiles(in: project)
+
+    let colorAssets = assets.filter { asset in
+        asset.url.pathExtension == "colorset"
+    }
+
+    var n: Int = 0
+    let total: Int = assets.count
+
+    let emptyColorAssets = colorAssets.filter { asset in
+        n = n + 1
+        #if DEBUG
+            progress?(n, total, asset.url.lastPathComponent)
+        #else
+            progress?(n, total, nil)
+        #endif
+        do {
+            let string = try String(
+                contentsOf: asset.url.appendingPathComponent("Contents.json")
+            )
+            if let data = string.data(using: .utf8) {
+                // see https://developer.apple.com/library/archive/documentation/Xcode/Reference/xcode_ref-Asset_Catalog_Format/Named_Color.html#//apple_ref/doc/uid/TP40015170-CH59-SW1
+                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                    let colors = json["colors"] as? [[String: Any]]
+                {
+                    for listing in colors {
+                        if let color = listing["color"] as? [String: Any], !color.isEmpty {
+                            return false
+                        }
+                    }
+                }
+            }
+        } catch {
+            // potentially corrupt; consider this empty for now
+        }
+        return true
+    }
+
+    let fileAssets = assets.filter { asset in
+        !colorAssets.contains(asset)
+    }
+
+    let missingFileAssets = fileAssets.filter { asset in
+        n = n + 1
+        #if DEBUG
+            progress?(n, total, asset.url.lastPathComponent)
+        #else
+            progress?(n, total, nil)
+        #endif
+        guard
+            let fileCount = try? FileManager.default
+                .contentsOfDirectory(
+                    at: asset.url,
+                    includingPropertiesForKeys: nil
+                )
+                .count
+        else {
+            fatalError()
+        }
+        // find all asset sets with no additional files other than a "Contents.json"
+        // (assuming that one always exists in asset sets)
+        return fileCount < 2
+
+    }
+
+    let emptyAssets = missingFileAssets + emptyColorAssets
+
+    progress?(total, total, nil)
+
+    return emptyAssets
+}
+
+private func findUnusedResources(
+    in project: XcodeProject,
+    stripCommentsInSourceFiles: Bool = true,
+    progress: ExaminationProgressCallback? = nil
+) -> [Resource] {
+    // find asset files; i.e. files inside asset catalogs, excluding those referenced by certain
+    // build settings as these typically won't be found using full-text search in sourcefiles
+    let assets = assetFiles(in: project)
+        .filter { asset in
+            // note that we should only need to check `name` here; other variants do not seem
+            // to be referenced for these settings
+            !project.referencesAssetForCatalogCompilation(named: asset.name)
+        }
+    var resources = resourceFiles(in: project) + assets
+    // full-text search every source-file
+    let sources = sourceFiles(in: project)
+    for (n, source) in sources.enumerated() {
+        #if DEBUG
+            progress?(n + 1, sources.count, source.url.lastPathComponent)
+        #else
+            progress?(n + 1, sources.count, nil)
+        #endif
+
+        let fileContents: String
+        do {
+            fileContents = try String(contentsOf: source.url)
+        } catch {
+            continue
+        }
+
+        var patterns: [NSRegularExpression] = []
+        if let kind = source.kind, kind.starts(with: "sourcecode") {
+            if stripCommentsInSourceFiles {
+                patterns.append(contentsOf: [
+                    // note prioritized order: strip block comments before line comments
+                    SourcePattern.blockComments, SourcePattern.lineComments,
+                ])
+            }
+        } else if source.kind == "text.xml" || source.kind == "text.html"
+            || source.url.pathExtension == "xml" || source.url.pathExtension == "html"
+        {
+            patterns.append(SourcePattern.htmlComments)
+        } else if source.kind == "text.plist.xml" || source.url.pathExtension == "plist",
+            project.referencesPropertyListAsInfoPlist(named: source)
+        {
+            patterns.append(SourcePattern.appFonts)
+        }
+
+        let strippedFileContents =
+            fileContents
+            .removingOccurrences(matchingExpressions: patterns)
+
+        resources.removeAll { resource in
+            // TODO: case-sensitive search, but UIImage/Font(named: might not be case sensitive
+            //       - would have to lower-case entire sourcefile too; can't catch mixed case errors otherwise
+            for resourceName in resource.nameVariants {
+                let searchStrings: [String]
+                if let kind = source.kind, kind.starts(with: "sourcecode") {
+                    // search for quoted strings in anything considered sourcecode;
+                    // e.g. `UIImage(named: "Icon10")`
+                    // however, consider the case:
+                    //      `loadspr("res/monster.png")`
+                    // here, the resource is actually "monster.png", but a build/copy phase
+                    // has moved the resource to another destination; this means searching
+                    //      `"monster.png"`
+                    // won't work out as we want it to; instead, we can just try to match
+                    // the end, which should work out no matter the destination, while
+                    // still being decently specific; e.g.
+                    //      `/monster.png"`
+                    searchStrings = ["\"\(resourceName)\"", "/\(resourceName)\""]
+                } else if source.kind == "text.plist.xml" || source.url.pathExtension == "plist" {
+                    // search property-lists; typically only node contents
+                    // e.g. "<key>Icon10</key>"
+                    searchStrings = [">\(resourceName)<"]
+                } else {
+                    // search any other text-based source; quoted strings and node content
+                    // e.g. "<key>Icon10</key>"
+                    //      "<key attr="Icon10">asdasd</key>"
+                    searchStrings = ["\"\(resourceName)\"", ">\(resourceName)<"]
+                }
+                for searchString in searchStrings {
+                    if strippedFileContents.contains(searchString) {
+                        // resource seems to be used; remove and don't search further for this
+                        return true
+                    }
+                }
+            }
+            // resource seems to be unused; don't remove and keep searching for usages
+            return false
+        }
+    }
+
+    progress?(sources.count, sources.count, nil)
+
+    return resources
+}
+
 public func examine(
     project: XcodeProject,
     for defect: Defect,
@@ -388,46 +610,10 @@ public func examine(
             )
         }
     case .corruptPropertyLists:
-        let propertyLists = propertyListReferences(in: project)
-
-        let corruptedPropertyLists =
-            propertyLists
-            .enumerated()
-            .compactMap({ n, file -> (FileReference, String)? in
-                #if DEBUG
-                    progress?(n + 1, propertyLists.count, file.url.lastPathComponent)
-                #else
-                    progress?(n + 1, propertyLists.count, nil)
-                #endif
-
-                do {
-                    _ = try PropertyListSerialization.propertyList(
-                        from: try Data(contentsOf: file.url),
-                        format: nil
-                    )
-                } catch let error as NSError {
-                    let additionalInfo: String
-                    if let helpfulErrorMessage = error.userInfo[NSDebugDescriptionErrorKey]
-                        as? String
-                    {
-                        // this is typically along the lines of:
-                        //  "Value missing for key inside <dict> at line 7"
-                        additionalInfo = helpfulErrorMessage
-                    } else {
-                        // this is typically more like:
-                        //  "The data couldn’t be read because it isn’t in the correct format."
-                        additionalInfo = error.localizedDescription
-                    }
-                    return (file, additionalInfo)
-                }
-                return nil
-            })
-
-        progress?(propertyLists.count, propertyLists.count, nil)
-
-        if !corruptedPropertyLists.isEmpty {
-            let paths = corruptedPropertyLists.map { file, additionalInfo in
-                "\(file.path): \(additionalInfo)"
+        let cases = findCorruptPropertyLists(in: project, progress: progress)
+        if !cases.isEmpty {
+            let paths = cases.map { condition in
+                "\(condition.file.path): \(condition.reason)"
             }
             return Diagnosis(
                 conclusion: "corrupted plists",
@@ -453,96 +639,11 @@ public func examine(
             )
         }
     case .unusedResources(let strippingComments):
-        // find asset files; i.e. files inside asset catalogs, excluding those referenced by certain
-        // build settings as these typically won't be found using full-text search in sourcefiles
-        let assets = assetFiles(in: project)
-            .filter { asset in
-                // note that we should only need to check `name` here; other variants do not seem
-                // to be referenced for these settings
-                !project.referencesAssetForCatalogCompilation(named: asset.name)
-            }
-        var resources = resourceFiles(in: project) + assets
-        // full-text search every source-file
-        let sources = sourceFiles(in: project)
-        for (n, source) in sources.enumerated() {
-            #if DEBUG
-                progress?(n + 1, sources.count, source.url.lastPathComponent)
-            #else
-                progress?(n + 1, sources.count, nil)
-            #endif
-
-            let fileContents: String
-            do {
-                fileContents = try String(contentsOf: source.url)
-            } catch {
-                continue
-            }
-
-            var patterns: [NSRegularExpression] = []
-            if let kind = source.kind, kind.starts(with: "sourcecode") {
-                if strippingComments {
-                    patterns.append(contentsOf: [
-                        // note prioritized order: strip block comments before line comments
-                        SourcePattern.blockComments, SourcePattern.lineComments,
-                    ])
-                }
-            } else if source.kind == "text.xml" || source.kind == "text.html"
-                || source.url.pathExtension == "xml" || source.url.pathExtension == "html"
-            {
-                patterns.append(SourcePattern.htmlComments)
-            } else if source.kind == "text.plist.xml" || source.url.pathExtension == "plist",
-                project.referencesPropertyListAsInfoPlist(named: source)
-            {
-                patterns.append(SourcePattern.appFonts)
-            }
-
-            let strippedFileContents =
-                fileContents
-                .removingOccurrences(matchingExpressions: patterns)
-
-            resources.removeAll { resource in
-                // TODO: case-sensitive search, but UIImage/Font(named: might not be case sensitive
-                //       - would have to lower-case entire sourcefile too; can't catch mixed case errors otherwise
-                for resourceName in resource.nameVariants {
-                    let searchStrings: [String]
-                    if let kind = source.kind, kind.starts(with: "sourcecode") {
-                        // search for quoted strings in anything considered sourcecode;
-                        // e.g. `UIImage(named: "Icon10")`
-                        // however, consider the case:
-                        //      `loadspr("res/monster.png")`
-                        // here, the resource is actually "monster.png", but a build/copy phase
-                        // has moved the resource to another destination; this means searching
-                        //      `"monster.png"`
-                        // won't work out as we want it to; instead, we can just try to match
-                        // the end, which should work out no matter the destination, while
-                        // still being decently specific; e.g.
-                        //      `/monster.png"`
-                        searchStrings = ["\"\(resourceName)\"", "/\(resourceName)\""]
-                    } else if source.kind == "text.plist.xml" || source.url.pathExtension == "plist"
-                    {
-                        // search property-lists; typically only node contents
-                        // e.g. "<key>Icon10</key>"
-                        searchStrings = [">\(resourceName)<"]
-                    } else {
-                        // search any other text-based source; quoted strings and node content
-                        // e.g. "<key>Icon10</key>"
-                        //      "<key attr="Icon10">asdasd</key>"
-                        searchStrings = ["\"\(resourceName)\"", ">\(resourceName)<"]
-                    }
-                    for searchString in searchStrings {
-                        if strippedFileContents.contains(searchString) {
-                            // resource seems to be used; remove and don't search further for this
-                            return true
-                        }
-                    }
-                }
-                // resource seems to be unused; don't remove and keep searching for usages
-                return false
-            }
-        }
-
-        progress?(sources.count, sources.count, nil)
-
+        let resources = findUnusedResources(
+            in: project,
+            stripCommentsInSourceFiles: strippingComments,
+            progress: progress
+        )
         if !resources.isEmpty {
             let unusedResourceNames = resources.map { resource -> String in
                 if resource.url.isAssetURL {
@@ -561,73 +662,9 @@ public func examine(
             )
         }
     case .emptyAssets:
-        let assets = assetFiles(in: project)
-
-        let colorAssets = assets.filter { asset in
-            asset.url.pathExtension == "colorset"
-        }
-
-        var n: Int = 0
-        let total: Int = assets.count
-
-        let emptyColorAssets = colorAssets.filter { asset in
-            n = n + 1
-            #if DEBUG
-                progress?(n, total, asset.url.lastPathComponent)
-            #else
-                progress?(n, total, nil)
-            #endif
-            do {
-                let string = try String(
-                    contentsOf: asset.url.appendingPathComponent("Contents.json")
-                )
-                if let data = string.data(using: .utf8) {
-                    // see https://developer.apple.com/library/archive/documentation/Xcode/Reference/xcode_ref-Asset_Catalog_Format/Named_Color.html#//apple_ref/doc/uid/TP40015170-CH59-SW1
-                    if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                        let colors = json["colors"] as? [[String: Any]]
-                    {
-                        for listing in colors {
-                            if let color = listing["color"] as? [String: Any], !color.isEmpty {
-                                return false
-                            }
-                        }
-                    }
-                }
-            } catch {
-                // potentially corrupt; consider this empty for now
-            }
-            return true
-        }
-
-        let fileAssets = assets.filter { asset in
-            !colorAssets.contains(asset)
-        }
-
-        let emptyFileAssets = fileAssets.filter { asset in
-            n = n + 1
-            #if DEBUG
-                progress?(n, total, asset.url.lastPathComponent)
-            #else
-                progress?(n, total, nil)
-            #endif
-            // find all asset sets with no additional files other than a "Contents.json"
-            // (assuming that one always exists in asset sets)
-            return
-                (try?
-                FileManager.default
-                .contentsOfDirectory(
-                    at: asset.url,
-                    includingPropertiesForKeys: nil
-                )
-                .count < 2) ?? false
-        }
-
-        let emptyAssets = emptyFileAssets + emptyColorAssets
-
-        progress?(total, total, nil)
-
-        if !emptyAssets.isEmpty {
-            let emptyAssetNames = emptyAssets.map { asset in
+        let assets = findEmptyAssets(in: project, progress: progress)
+        if !assets.isEmpty {
+            let emptyAssetNames = assets.map { asset in
                 asset.name
             }
             return Diagnosis(

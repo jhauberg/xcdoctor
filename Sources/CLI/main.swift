@@ -13,12 +13,12 @@ import XCDoctor
 var outputStream = DiagnosticOutputStream()
 
 extension String {
-    func capitalizingFirstLetter() -> String {
+    fileprivate func capitalizingFirstLetter() -> String {
         return prefix(1).capitalized + dropFirst()
     }
 }
 
-func printdiag(text: String, kind: Diagnostic = .information) {
+private func printdiag(text: String, kind: Diagnostic = .information) {
     // TODO: this validation only applies when actually output;
     //       consider applying these earlier; i.e. when initializating a diagnosis?
     switch kind {
@@ -148,14 +148,14 @@ struct Doctor: ParsableCommand {
         // so, for example, nonExistentFiles should be cleared before danglingFiles,
         // as that likely has a cascading effect throughout previous diagnoses
         let conditions: [Defect] = [
-            .emptyAssets, // least important
+            .emptyAssets,  // least important
             .unusedResources(strippingSourceComments: !keepComments),
             .emptyGroups,
             .danglingFiles,
             .emptyTargets,
             .corruptPropertyLists,
             .nonExistentFiles,
-            .nonExistentPaths, // most important
+            .nonExistentPaths,  // most important
         ]
 
         for condition in conditions {
