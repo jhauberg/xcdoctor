@@ -233,17 +233,6 @@ private func resourceFiles(in project: XcodeProject) -> [Resource] {
         }
 }
 
-extension URL {
-    /**
-     A Boolean that is `true` if the URL points to a directory containing a "Contents.json" file.
-     */
-    fileprivate var isAssetURL: Bool {
-        FileManager.default.fileExists(
-            atPath: appendingPathComponent("Contents.json").path
-        )
-    }
-}
-
 extension String {
     fileprivate func removingOccurrences(matchingExpressions expressions: [NSRegularExpression])
         -> String
@@ -281,7 +270,7 @@ private func assetURLs(at url: URL) -> [URL] {
             item as! URL
         }
         .filter { url in
-            url.isDirectory && url.isAssetURL && !url.pathExtension.isEmpty
+            url.isDirectory && url.isAssetDirectory && !url.pathExtension.isEmpty
         }
 }
 
@@ -646,7 +635,7 @@ public func examine(
         )
         if !resources.isEmpty {
             let unusedResourceNames = resources.map { resource -> String in
-                if resource.url.isAssetURL {
+                if resource.url.isAssetDirectory {
                     return resource.name
                 }
                 return resource.fileName

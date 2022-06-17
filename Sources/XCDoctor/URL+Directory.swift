@@ -17,4 +17,13 @@ extension URL {
             .isDirectory  // file exists and is a directory
         ) ?? false  // file does not exist
     }
+
+    /**
+     A Boolean that is `true` if the URL points to a directory containing a "Contents.json" file.
+     */
+    var isAssetDirectory: Bool {
+        FileManager.default.fileExists(
+            atPath: appendingPathComponent("Contents.json").path
+        )
+    }
 }
