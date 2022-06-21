@@ -28,7 +28,6 @@ private let sourceTypes: [(String, [String])] = [
     ("sourcecode.cpp.cpp", ["cpp", "cc"]),
     ("sourcecode.cpp.h", ["h", "hh"]),
     ("sourcecode.swift", ["swift"]),
-    ("sourcecode.metal", ["metal", "mtl"]),
     ("text.script.sh", ["sh"]),
 ]
 

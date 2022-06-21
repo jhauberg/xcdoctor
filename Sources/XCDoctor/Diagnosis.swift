@@ -129,7 +129,8 @@ private func danglingFiles(
                 && !ref.isHeaderFile
                 && (ref.isSourceFile || (
                     ref.kind == "folder.assetcatalog" ||
-                    ref.url.pathExtension == "xcassets"
+                    ref.url.pathExtension == "xcassets" ||
+                    ref.kind == "sourcecode.metal"
                 ))
         }
         .filter { ref in
@@ -228,6 +229,7 @@ private func resourceFiles(in project: XcodeProject) -> [Resource] {
                 && ref.kind != "wrapper.framework"  // not a dynamic framework
                 && ref.url.pathExtension != "a"  // not a static library
                 && ref.url.pathExtension != "xcconfig"  // not xcconfig
+                && ref.kind != "sourcecode.metal"  // not a Metal shader
                 && !ref.url.lastPathComponent.hasPrefix(".")  // not a hidden file
                 && !sources.contains { sourceRef -> Bool in
                     ref.url == sourceRef.url  // not a source-file
