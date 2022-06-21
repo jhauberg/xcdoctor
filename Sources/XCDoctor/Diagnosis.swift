@@ -125,7 +125,12 @@ private func danglingFiles(
 ) -> [FileReference] {
     project.files
         .filter { ref in
-            !ref.isHeaderFile && ref.isSourceFile && !ref.hasTargetMembership
+            !ref.hasTargetMembership
+                && !ref.isHeaderFile
+                && (ref.isSourceFile || (
+                    ref.kind == "folder.assetcatalog" ||
+                    ref.url.pathExtension == "xcassets"
+                ))
         }
         .filter { ref in
             if ref.kind == "text.plist.xml" || ref.url.pathExtension == "plist" {

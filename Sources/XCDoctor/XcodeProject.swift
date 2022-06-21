@@ -12,12 +12,12 @@ import Foundation
 // note that files matching these indicators will be subject
 // to full-text search (unusedResources), so including assets
 // (e.g. images, or videos, in particular) would not be ideal
+// additionally, any file referenced in a project that does _not_
+// match any of these indicators will be considered resource files
 private let sourceTypes: [(String, [String])] = [
     ("file.storyboard", ["storyboard"]),
     ("file.xib", ["xib", "nib"]),
-    // TODO: technically assetcatalog is not a source-file, but included to enable dangling check
-    ("folder.assetcatalog", ["xcassets"]),
-    ("text.plist.strings", ["strings"]),
+    ("text.plist.strings", ["strings"]), // todo: maybe not appropriate as a source file?
     ("text.plist.xml", ["plist"]),
     ("text.xml", ["xml"]),
     ("text.html", ["html"]),
