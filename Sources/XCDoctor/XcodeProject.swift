@@ -28,7 +28,6 @@ private let sourceTypes: [(String, [String])] = [
     ("sourcecode.cpp.cpp", ["cpp", "cc"]),
     ("sourcecode.cpp.h", ["h", "hh"]),
     ("sourcecode.swift", ["swift"]),
-    ("text.script.sh", ["sh"]),
 ]
 
 // represents any object in a pbxproj file; it's essentially just a key (id) and a dict
