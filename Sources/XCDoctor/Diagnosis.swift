@@ -81,7 +81,7 @@ public struct Diagnosis {
     /**
      Represents a set of concrete cases that are directly linked to causing this diagnosis.
      */
-    public let cases: [String]?
+    public let cases: [String]
 }
 
 private func nonExistentFiles(in project: XcodeProject) -> [FileReference] {

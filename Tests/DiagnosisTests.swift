@@ -20,7 +20,7 @@ class DiagnosisTests: XCTestCase {
         let diagnosis = examine(project: project, for: .nonExistentFiles)
         XCTAssertNotNil(diagnosis)
         XCTAssertNotNil(diagnosis!.cases)
-        XCTAssert(diagnosis!.cases!.count == 1)
+        XCTAssert(diagnosis!.cases.count == 1)
     }
 
     func testMissingFolder() {
@@ -32,7 +32,7 @@ class DiagnosisTests: XCTestCase {
         let diagnosis = examine(project: project, for: .nonExistentPaths)
         XCTAssertNotNil(diagnosis)
         XCTAssertNotNil(diagnosis!.cases)
-        XCTAssert(diagnosis!.cases!.count == 1)
+        XCTAssert(diagnosis!.cases.count == 1)
     }
 
     func testCorruptPlist() {
@@ -45,7 +45,7 @@ class DiagnosisTests: XCTestCase {
         let diagnosis = examine(project: project, for: condition)
         XCTAssertNotNil(diagnosis)
         XCTAssertNotNil(diagnosis!.cases)
-        XCTAssert(diagnosis!.cases!.count == 1)
+        XCTAssert(diagnosis!.cases.count == 1)
     }
 
     func testDanglingFile() {
@@ -58,7 +58,7 @@ class DiagnosisTests: XCTestCase {
         let diagnosis = examine(project: project, for: condition)
         XCTAssertNotNil(diagnosis)
         XCTAssertNotNil(diagnosis!.cases)
-        XCTAssert(diagnosis!.cases!.count == 1)
+        XCTAssert(diagnosis!.cases.count == 1)
     }
 
     func testEmptyGroups() {

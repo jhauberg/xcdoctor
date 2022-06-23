@@ -196,10 +196,9 @@ struct Doctor: ParsableCommand {
                 for: condition,
                 progress: activity
             ) {
-                if let references = diagnosis.cases?.sorted() {
-                    for reference in references {
-                        printdiag(text: reference, kind: .result)
-                    }
+                precondition(!diagnosis.cases.isEmpty)
+                for reference in diagnosis.cases.sorted() {
+                    printdiag(text: reference, kind: .result)
                 }
                 printdiag(text: diagnosis.conclusion, kind: .important)
                 if let supplemental = diagnosis.help {
