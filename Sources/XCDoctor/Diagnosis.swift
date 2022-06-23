@@ -8,6 +8,13 @@
 
 import Foundation
 
+// TODO: the idea of a narrow search => broad search
+//        * probably leads to A LOT of output
+//        * and every time; because typically broad search means the thing IS in use, it just isn't obvious to the computer
+//          ^ in this case, is there really actually any use in making the search?
+
+// TODO: consider showing how significant a file is (kb); maybe even sorting on this
+
 /**
  Represents an undesired condition for an Xcode project.
  */
@@ -639,12 +646,50 @@ public func examine(
             progress: progress
         )
         if !resources.isEmpty {
-            let unusedResourceNames = resources.map { resource -> String in
-                if resource.url.isAssetDirectory {
-                    return resource.name
+            let unusedResources: [(String, Int)] = resources.map { resource in
+                let fileSizeInBytes: Int
+                if resource.url.isDirectory {
+                    if let urls = FileManager.default.enumerator(at: resource.url, includingPropertiesForKeys: nil)?.allObjects as? [URL] {
+                        fileSizeInBytes = urls.reduce(0) { partialResult, url in
+                            ((try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0) + partialResult
+                        }
+                    } else {
+                        fileSizeInBytes = -1
+                    }
+
+                } else {
+                    if let attr = try? resource.url.resourceValues(forKeys:[.fileSizeKey]),
+                       let fileSize = attr.fileSize {
+                        fileSizeInBytes = fileSize
+                    } else {
+                        fileSizeInBytes = -1
+                    }
                 }
-                return resource.fileName
+                let name: String
+                if resource.url.isAssetDirectory {
+                    name = resource.name
+                } else {
+                    name = resource.fileName
+                }
+                return (name, fileSizeInBytes)
             }
+            let fileSizeFormatter = ByteCountFormatter()
+            fileSizeFormatter.countStyle = .file
+            let cases: [String] = unusedResources
+                .sorted(by: { (lhs, rhs) in
+                    let (name, fileSize) = lhs
+                    let (otherName, otherFileSize) = rhs
+                    return (fileSize, name) < (otherFileSize, otherName)
+                })
+                .map { name, fileSizeInBytes in
+                    if fileSizeInBytes >= 0 {
+                        let prettyFileSize = fileSizeFormatter.string(
+                            fromByteCount: Int64(fileSizeInBytes)
+                        )
+                        return "\(name) (\(prettyFileSize))"
+                    }
+                    return name
+                }
             return Diagnosis(
                 conclusion: "unused resources (\(resources.count))",
                 help: """
@@ -652,7 +697,7 @@ public func examine(
                     Note that this diagnosis is prone to false-positives as it can't realistically
                     detect all usage patterns with certainty. Proceed with caution.
                     """,
-                cases: unusedResourceNames.sorted()
+                cases: cases
             )
         }
     case .emptyAssets:
