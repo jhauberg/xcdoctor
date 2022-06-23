@@ -226,7 +226,8 @@ private func resourceFiles(in project: XcodeProject) -> [Resource] {
             // TODO: specific exclusions? e.g. "archive.ar"/"a", ".whatever" etc
             ref.hasTargetMembership && ref.kind != "folder.assetcatalog"  // not an assetcatalog
                 && ref.url.pathExtension != "xcassets"  // not an assetcatalog
-                && ref.kind != "wrapper.framework"  // not a dynamic framework
+                && ref.kind != "wrapper.framework"  // not a framework
+                && ref.kind != "wrapper.xcframework"  // not a framework
                 && ref.url.pathExtension != "a"  // not a static library
                 && ref.url.pathExtension != "xcconfig"  // not xcconfig
                 && ref.kind != "sourcecode.metal"  // not a Metal shader

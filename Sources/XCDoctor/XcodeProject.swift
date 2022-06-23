@@ -14,6 +14,8 @@ import Foundation
 // (e.g. images, or videos, in particular) would not be ideal
 // additionally, any file referenced in a project that does _not_
 // match any of these indicators will be considered resource files
+// todo: should be enum with data...
+// https://www.splinter.com.au/2021/05/17/xcode-project-generator/
 private let sourceTypes: [(String, [String])] = [
     ("file.storyboard", ["storyboard"]),
     ("file.xib", ["xib", "nib"]),
