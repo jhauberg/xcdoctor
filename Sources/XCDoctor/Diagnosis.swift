@@ -566,12 +566,12 @@ public func examine(
                 ref.path
             }
             return Diagnosis(
-                conclusion: "non-existent files",
+                conclusion: "non-existent files (\(files.count))",
                 help: """
                     These files are not present on the file system and could have been moved or removed.
                     In either case, each reference should be resolved or removed from the project.
                     """,
-                cases: paths
+                cases: paths.sorted()
             )
         }
     case .nonExistentPaths:
@@ -581,7 +581,7 @@ public func examine(
                 "\(ref.path!): \"\(ref.projectUrl.absoluteString)\""
             }
             return Diagnosis(
-                conclusion: "non-existent group paths",
+                conclusion: "non-existent group paths (\(groups.count))",
                 // TODO: word this differently; a non-existent path is typically harmless:
                 //
                 //       "This is typically seen in projects under version-control, where a
@@ -599,7 +599,7 @@ public func examine(
                     If not corrected, these paths can cause tools to erroneously
                     map children of each group to non-existent files.
                     """,
-                cases: paths
+                cases: paths.sorted()
             )
         }
     case .corruptPropertyLists:
@@ -609,11 +609,11 @@ public func examine(
                 "\(condition.file.path): \(condition.reason)"
             }
             return Diagnosis(
-                conclusion: "corrupted plists",
+                conclusion: "corrupted plists (\(cases.count))",
                 help: """
                     These files must be fixed manually using any plain-text editor.
                     """,
-                cases: paths
+                cases: paths.sorted()
             )
         }
     case .danglingFiles:
@@ -623,12 +623,12 @@ public func examine(
                 file.path
             }
             return Diagnosis(
-                conclusion: "files not included in any target",
+                conclusion: "files not included in any target (\(files.count))",
                 help: """
                     These files are never being compiled and might not be used;
                     consider whether they should be removed.
                     """,
-                cases: paths
+                cases: paths.sorted()
             )
         }
     case .unusedResources(let strippingComments):
@@ -645,13 +645,13 @@ public func examine(
                 return resource.fileName
             }
             return Diagnosis(
-                conclusion: "unused resources",
+                conclusion: "unused resources (\(resources.count))",
                 help: """
                     These files might not be used; consider whether they should be removed.
                     Note that this diagnosis is prone to false-positives as it can't realistically
                     detect all usage patterns with certainty. Proceed with caution.
                     """,
-                cases: unusedResourceNames
+                cases: unusedResourceNames.sorted()
             )
         }
     case .emptyAssets:
@@ -661,12 +661,12 @@ public func examine(
                 asset.name
             }
             return Diagnosis(
-                conclusion: "empty assets",
+                conclusion: "empty assets (\(assets.count))",
                 help: """
                     These asset sets contain zero actual resources and might be redundant;
                     consider whether they should be removed.
                     """,
-                cases: emptyAssetNames
+                cases: emptyAssetNames.sorted()
             )
         }
     case .emptyGroups:
@@ -676,12 +676,12 @@ public func examine(
                 "\(ref.projectUrl.absoluteString)"
             }
             return Diagnosis(
-                conclusion: "empty groups",
+                conclusion: "empty groups (\(groups.count))",
                 help: """
                     These groups contain zero children and might be redundant;
                     consider whether they should be removed.
                     """,
-                cases: paths
+                cases: paths.sorted()
             )
         }
     case .emptyTargets:
@@ -691,12 +691,12 @@ public func examine(
                 product.name
             }
             return Diagnosis(
-                conclusion: "empty targets",
+                conclusion: "empty targets (\(targets.count))",
                 help: """
                     These targets do not compile any sources and might be redundant;
                     consider whether they should be removed.
                     """,
-                cases: names
+                cases: names.sorted()
             )
         }
     }
