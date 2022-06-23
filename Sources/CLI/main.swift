@@ -200,7 +200,7 @@ struct Doctor: ParsableCommand {
                 for reference in diagnosis.cases.sorted() {
                     printdiag(text: reference, kind: .result)
                 }
-                printdiag(text: diagnosis.conclusion, kind: .important)
+                printdiag(text: "\(diagnosis.conclusion) (\(diagnosis.cases.count))", kind: .important)
                 if let supplemental = diagnosis.help {
                     printdiag(text: supplemental, kind: .note)
                 }
