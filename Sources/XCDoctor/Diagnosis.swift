@@ -347,7 +347,9 @@ private func findCorruptPropertyLists(
     in project: XcodeProject,
     progress: ExaminationProgressCallback? = nil
 ) -> [CorruptPropertyListCase] {
-    let propertyLists = propertyListReferences(in: project)
+    let propertyLists = propertyListReferences(in: project).filter { ref in
+        FileManager.default.fileExists(atPath: ref.path)
+    }
 
     let corruptedPropertyLists =
         propertyLists
@@ -482,6 +484,12 @@ private func findUnusedResources(
             resource.url.pathExtension != "storyboard"
                 || !project.referencesStoryboardAsPreset(named: resource.name)
         } + assets
+    resources.removeAll { res in
+        !FileManager.default.fileExists(atPath: res.path) // don't process non-existent files
+    }
+    let sources = sourceFiles(in: project).filter { ref in
+        FileManager.default.fileExists(atPath: ref.path)
+    }
     // full-text search every source-file
     let sources = sourceFiles(in: project)
     for (n, source) in sources.enumerated() {
