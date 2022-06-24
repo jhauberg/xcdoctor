@@ -525,19 +525,11 @@ private func findUnusedResources(
                 let searchStrings: [String]
                 if let kind = source.kind, kind.starts(with: "sourcecode") {
                     // search for quoted strings in anything considered sourcecode;
-                    // e.g. `UIImage(named: "Icon10")`
                     if resource.url.isAssetDirectory {
+                        // always similar to `UIImage(named: "Icon10")`
                         searchStrings = ["\"\(resourceName)\""]
                     } else {
-                        // however, consider the case:
-                        //      `loadspr("res/monster.png")`
-                        // here, the resource is actually "monster.png", but a build/copy phase
-                        // has moved the resource to another destination; this means searching
-                        //      `"monster.png"`
-                        // won't work out as we want it to; instead, we can just try to match
-                        // the end, which should work out no matter the destination, while
-                        // still being decently specific; e.g.
-                        //      `/monster.png"`
+                        // could also be part of a path, e.g. `load("data/machines.json")`
                         searchStrings = ["\"\(resourceName)\"", "/\(resourceName)\""]
                     }
                 } else if source.kind == "text.plist.xml" || source.url.pathExtension == "plist" {
@@ -548,7 +540,7 @@ private func findUnusedResources(
                     // search any other text-based source; quoted strings and node content
                     // e.g. "<key>Icon10</key>"
                     //      "<key attr="Icon10">asdasd</key>"
-                    searchStrings = ["\"\(resourceName)\"", ">\(resourceName)<"]
+                    searchStrings = [">\(resourceName)<", "\"\(resourceName)\""]
                 }
                 for searchString in searchStrings {
                     if strippedFileContents.contains(searchString) {
