@@ -224,6 +224,9 @@ private func resourceFiles(in project: XcodeProject) -> [Resource] {
             // a resource is any file included in a project that is not considered a source file
             // while also matching the requirements below
             // TODO: specific exclusions? e.g. "archive.ar"/"a", ".whatever" etc
+            // TODO: iOS has a special case "Settings.bundle" that is typically only used by the OS
+            //       it will list as a false-positive, but this file should _only_ be excluded
+            //       for iOS projects- how can we determine this?
             ref.hasTargetMembership  // must be included in a build phase for any target
                 && ref.kind != "folder.assetcatalog"  // not an assetcatalog
                 && ref.url.pathExtension != "xcassets"  // not an assetcatalog
@@ -491,7 +494,6 @@ private func findUnusedResources(
         FileManager.default.fileExists(atPath: ref.path)
     }
     // full-text search every source-file
-    let sources = sourceFiles(in: project)
     for (n, source) in sources.enumerated() {
         #if DEBUG
             progress?(n + 1, sources.count, source.url.lastPathComponent)
