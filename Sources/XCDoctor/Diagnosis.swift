@@ -229,6 +229,8 @@ private func resourceFiles(in project: XcodeProject) -> [Resource] {
             ref.hasTargetMembership  // must be included in a build phase for any target
                 && ref.kind != "folder.assetcatalog"  // not an assetcatalog
                 && ref.url.pathExtension != "xcassets"  // not an assetcatalog
+                && ref.kind != "text.plist.strings"  // not a strings file
+                && ref.url.pathExtension != "strings"  // not a strings file
                 && ref.kind != "wrapper.framework"  // not a framework
                 && ref.kind != "wrapper.xcframework"  // not a framework
                 && ref.url.pathExtension != "a"  // not a static library

@@ -17,7 +17,6 @@ import Foundation
 private let sourceTypes: [(String, [String])] = [
     ("file.storyboard", ["storyboard"]),
     ("file.xib", ["xib", "nib"]),
-    ("text.plist.strings", ["strings"]), // todo: maybe not appropriate as a source file?
     ("text.plist.xml", ["plist"]),
     ("text.xml", ["xml"]),
     ("text.html", ["html"]),
