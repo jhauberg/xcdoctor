@@ -149,13 +149,9 @@ private func danglingFiles(
 }
 
 private func sourceFiles(in project: XcodeProject) -> [FileReference] {
-    let exceptFiles = nonExistentFiles(in: project)
     return project.files.filter { ref in
         ref.isSourceFile  // file is compiled in one way or another
             && !ref.url.isDirectory  // file is text-based; i.e. not a directory
-            && !exceptFiles.contains(where: { otherRef -> Bool in  // file exists
-                ref.url == otherRef.url
-            })
     }
 }
 
