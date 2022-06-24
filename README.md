@@ -86,7 +86,7 @@ The purpose of an examination is to discover and identify defects in an Xcode pr
 
 This process includes resolving and validating file/group references, determining unused resources and more. For a complete list of checks, see [Diagnosis.swift](https://github.com/jhauberg/xcdoctor/blob/master/Sources/XCDoctor/Diagnosis.swift#L14-L67).
 
-**No files are touched during an examination;** the user must manually take action on any reported defects.
+**No files are deleted or modified during an examination;** the user must manually take action on any reported defects.
 
 # Diagnosis
 
