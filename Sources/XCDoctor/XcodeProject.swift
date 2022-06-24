@@ -461,9 +461,9 @@ public final class XcodeProject {
     func referencesAssetForCatalogCompilation(named asset: String) -> Bool {
         for object in buildConfigurations {
             if let settings = object.properties["buildSettings"] as? [String: Any] {
-                for assetCompilerSetting in assetCatalogCompilerSettings {
-                    if let assetCompilerSettingValue = settings[assetCompilerSetting] as? String,
-                        assetCompilerSettingValue == asset
+                for setting in assetCatalogCompilerSettings {
+                    if let settingValue = settings[setting] as? String,
+                        settingValue == asset
                     {
                         return true
                     }
@@ -482,6 +482,26 @@ public final class XcodeProject {
                         with: location.root.standardized.path
                     )
                     if file.url.standardized.path.hasSuffix(setting) {
+                        return true
+                    }
+                }
+            }
+        }
+        return false
+    }
+
+    let storyboardPresetSettings = [
+        "INFOPLIST_KEY_UIMainStoryboardFile",
+        "INFOPLIST_KEY_UILaunchStoryboardName",
+    ]
+
+    func referencesStoryboardAsPreset(named asset: String) -> Bool {
+        for object in buildConfigurations {
+            if let settings = object.properties["buildSettings"] as? [String: Any] {
+                for setting in storyboardPresetSettings {
+                    if let settingValue = settings[setting] as? String,
+                        settingValue == asset
+                    {
                         return true
                     }
                 }

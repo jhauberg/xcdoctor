@@ -218,16 +218,23 @@ private struct Resource: Equatable {
 private func resourceFiles(in project: XcodeProject) -> [Resource] {
     let sources = sourceFiles(in: project)
         .filter { ref in
-            // exclude xml/html files as sources; consider them both source and resource
+            // certain files should be considered both source and resource; e.g. xibs, storyboards
+            // (note that even if excluded here, they will still be represented as sources later)
             // TODO: this is a bit of a slippery slope; where do we draw the line?
             //       stuff like JSON and YAML probably fits here as well, etc. etc. ...
-            ref.kind != "text.xml" && ref.url.pathExtension != "xml" && ref.kind != "text.html"
-                && ref.url.pathExtension != "html"
+            ref.kind != "text.xml" && ref.url.pathExtension != "xml"  // allow plain xml
+                && ref.kind != "text.html" && ref.url.pathExtension != "html"  // allow plain html
+                && ref.kind != "file.storyboard" && ref.url.pathExtension != "storyboard"  // allow storyboards
+                && ref.kind != "file.xib" && ref.url.pathExtension != "xib"  // allow xibs
+                && ref.url.pathExtension != "nib"  // allow nibs
         }
     return project.files
         .filter { ref in
+            // a resource is any file included in a project that is not considered a source file
+            // while also matching the requirements below
             // TODO: specific exclusions? e.g. "archive.ar"/"a", ".whatever" etc
-            ref.hasTargetMembership && ref.kind != "folder.assetcatalog"  // not an assetcatalog
+            ref.hasTargetMembership  // must be included in a build phase for any target
+                && ref.kind != "folder.assetcatalog"  // not an assetcatalog
                 && ref.url.pathExtension != "xcassets"  // not an assetcatalog
                 && ref.kind != "wrapper.framework"  // not a framework
                 && ref.kind != "wrapper.xcframework"  // not a framework
@@ -453,7 +460,6 @@ private func findEmptyAssets(
         // find all asset sets with no additional files other than a "Contents.json"
         // (assuming that one always exists in asset sets)
         return fileCount < 2
-
     }
 
     let emptyAssets = missingFileAssets + emptyColorAssets
@@ -476,7 +482,13 @@ private func findUnusedResources(
             // to be referenced for these settings
             !project.referencesAssetForCatalogCompilation(named: asset.name)
         }
-    var resources = resourceFiles(in: project) + assets
+    var resources =
+        resourceFiles(in: project)
+        .filter { resource in
+            // exclude storyboards explicitly referenced in certain build settings
+            resource.url.pathExtension != "storyboard"
+                || !project.referencesStoryboardAsPreset(named: resource.name)
+        } + assets
     // full-text search every source-file
     let sources = sourceFiles(in: project)
     for (n, source) in sources.enumerated() {
@@ -516,20 +528,25 @@ private func findUnusedResources(
             // TODO: case-sensitive search, but UIImage/Font(named: might not be case sensitive
             //       - would have to lower-case entire sourcefile too; can't catch mixed case errors otherwise
             for resourceName in resource.nameVariants {
+                // list of strings to search for; if any matches move on to next resource
                 let searchStrings: [String]
                 if let kind = source.kind, kind.starts(with: "sourcecode") {
                     // search for quoted strings in anything considered sourcecode;
                     // e.g. `UIImage(named: "Icon10")`
-                    // however, consider the case:
-                    //      `loadspr("res/monster.png")`
-                    // here, the resource is actually "monster.png", but a build/copy phase
-                    // has moved the resource to another destination; this means searching
-                    //      `"monster.png"`
-                    // won't work out as we want it to; instead, we can just try to match
-                    // the end, which should work out no matter the destination, while
-                    // still being decently specific; e.g.
-                    //      `/monster.png"`
-                    searchStrings = ["\"\(resourceName)\"", "/\(resourceName)\""]
+                    if resource.url.isAssetDirectory {
+                        searchStrings = ["\"\(resourceName)\""]
+                    } else {
+                        // however, consider the case:
+                        //      `loadspr("res/monster.png")`
+                        // here, the resource is actually "monster.png", but a build/copy phase
+                        // has moved the resource to another destination; this means searching
+                        //      `"monster.png"`
+                        // won't work out as we want it to; instead, we can just try to match
+                        // the end, which should work out no matter the destination, while
+                        // still being decently specific; e.g.
+                        //      `/monster.png"`
+                        searchStrings = ["\"\(resourceName)\"", "/\(resourceName)\""]
+                    }
                 } else if source.kind == "text.plist.xml" || source.url.pathExtension == "plist" {
                     // search property-lists; typically only node contents
                     // e.g. "<key>Icon10</key>"
