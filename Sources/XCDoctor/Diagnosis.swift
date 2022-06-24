@@ -649,21 +649,19 @@ public func examine(
             let unusedResources: [(String, Int)] = resources.map { resource in
                 let fileSizeInBytes: Int
                 if resource.url.isDirectory {
-                    if let urls = FileManager.default.enumerator(at: resource.url, includingPropertiesForKeys: nil)?.allObjects as? [URL] {
+                    guard let urls = FileManager.default.enumerator(at: resource.url, includingPropertiesForKeys: nil)?.allObjects as? [URL] else {
+                        fatalError()
+                    }
                         fileSizeInBytes = urls.reduce(0) { partialResult, url in
                             ((try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0) + partialResult
                         }
-                    } else {
-                        fileSizeInBytes = -1
-                    }
 
                 } else {
-                    if let attr = try? resource.url.resourceValues(forKeys:[.fileSizeKey]),
-                       let fileSize = attr.fileSize {
-                        fileSizeInBytes = fileSize
-                    } else {
-                        fileSizeInBytes = -1
+                    guard let attr = try? resource.url.resourceValues(forKeys:[.fileSizeKey]),
+                       let fileSize = attr.fileSize else {
+                        fatalError()
                     }
+                    fileSizeInBytes = fileSize
                 }
                 let name: String
                 if resource.url.isAssetDirectory {
@@ -682,7 +680,7 @@ public func examine(
                     return (fileSize, name) < (otherFileSize, otherName)
                 })
                 .map { name, fileSizeInBytes in
-                    if fileSizeInBytes >= 0 {
+                    if fileSizeInBytes > 0 {
                         let prettyFileSize = fileSizeFormatter.string(
                             fromByteCount: Int64(fileSizeInBytes)
                         )
@@ -690,10 +688,17 @@ public func examine(
                     }
                     return name
                 }
+            let totalFileSizeInBytes = unusedResources.reduce(0) { partialResult, nextResult in
+                let (_, fileSize) = nextResult
+                return partialResult + fileSize
+            }
+            let prettyTotalFileSize = totalFileSizeInBytes > 0 ? fileSizeFormatter.string(
+                fromByteCount: Int64(totalFileSizeInBytes)
+            ) : "space"
             return Diagnosis(
-                conclusion: "unused resources (\(resources.count))",
+                conclusion: "unused resources (\(unusedResources.count))",
                 help: """
-                    These files might not be used; consider whether they should be removed.
+                    These files might not be used; consider whether they should be removed to free up \(prettyTotalFileSize).
                     Note that this diagnosis is prone to false-positives as it can't realistically
                     detect all usage patterns with certainty. Proceed with caution.
                     """,
