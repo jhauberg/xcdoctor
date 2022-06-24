@@ -8,13 +8,6 @@
 
 import Foundation
 
-// TODO: the idea of a narrow search => broad search
-//        * probably leads to A LOT of output
-//        * and every time; because typically broad search means the thing IS in use, it just isn't obvious to the computer
-//          ^ in this case, is there really actually any use in making the search?
-
-// TODO: consider showing how significant a file is (kb); maybe even sorting on this
-
 /**
  Represents an undesired condition for an Xcode project.
  */
