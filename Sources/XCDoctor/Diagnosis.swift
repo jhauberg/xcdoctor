@@ -127,11 +127,9 @@ private func danglingFiles(
         .filter { ref in
             !ref.hasTargetMembership
                 && !ref.isHeaderFile
-                && (ref.isSourceFile || (
-                    ref.kind == "folder.assetcatalog" ||
-                    ref.url.pathExtension == "xcassets" ||
-                    ref.kind == "sourcecode.metal"
-                ))
+                && (ref.isSourceFile
+                    || (ref.kind == "folder.assetcatalog" || ref.url.pathExtension == "xcassets"
+                        || ref.kind == "sourcecode.metal"))
         }
         .filter { ref in
             if ref.kind == "text.plist.xml" || ref.url.pathExtension == "plist" {
@@ -657,16 +655,25 @@ public func examine(
             let unusedResources: [(String, Int)] = resources.map { resource in
                 let fileSizeInBytes: Int
                 if resource.url.isDirectory {
-                    guard let urls = FileManager.default.enumerator(at: resource.url, includingPropertiesForKeys: nil)?.allObjects as? [URL] else {
+                    guard
+                        let urls =
+                            FileManager.default.enumerator(
+                                at: resource.url,
+                                includingPropertiesForKeys: nil
+                            )?
+                            .allObjects as? [URL]
+                    else {
                         fatalError()
                     }
-                        fileSizeInBytes = urls.reduce(0) { partialResult, url in
-                            ((try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0) + partialResult
-                        }
+                    fileSizeInBytes = urls.reduce(0) { partialResult, url in
+                        ((try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+                            + partialResult
+                    }
 
                 } else {
-                    guard let attr = try? resource.url.resourceValues(forKeys:[.fileSizeKey]),
-                       let fileSize = attr.fileSize else {
+                    guard let attr = try? resource.url.resourceValues(forKeys: [.fileSizeKey]),
+                        let fileSize = attr.fileSize
+                    else {
                         fatalError()
                     }
                     fileSizeInBytes = fileSize
@@ -681,7 +688,8 @@ public func examine(
             }
             let fileSizeFormatter = ByteCountFormatter()
             fileSizeFormatter.countStyle = .file
-            let cases: [String] = unusedResources
+            let cases: [String] =
+                unusedResources
                 .sorted(by: { (lhs, rhs) in
                     let (name, fileSize) = lhs
                     let (otherName, otherFileSize) = rhs
@@ -700,9 +708,11 @@ public func examine(
                 let (_, fileSize) = nextResult
                 return partialResult + fileSize
             }
-            let prettyTotalFileSize = totalFileSizeInBytes > 0 ? fileSizeFormatter.string(
-                fromByteCount: Int64(totalFileSizeInBytes)
-            ) : "space"
+            let prettyTotalFileSize =
+                totalFileSizeInBytes > 0
+                ? fileSizeFormatter.string(
+                    fromByteCount: Int64(totalFileSizeInBytes)
+                ) : "space"
             return Diagnosis(
                 conclusion: "unused resources (\(unusedResources.count))",
                 help: """
